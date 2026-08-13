@@ -1,0 +1,536 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: 'Comic Sans MS', 'Comic Sans', cursive;
+  --font-display: 'Comic Sans MS', 'Comic Sans', cursive;
+
+  --color-peach-50: #FFF5F0;
+  --color-peach-100: #FFE5D9;
+  --color-peach-200: #FFD4C2;
+  --color-mint-200: #B8E6D5;
+  --color-lilac-200: #D4C5E2;
+  --color-yellow-200: #FFF4B0;
+}
+
+@layer base {
+  html,
+  body,
+  #root {
+    min-height: 100%;
+  }
+
+  html,
+  body,
+  #root,
+  button,
+  input,
+  textarea,
+  select,
+  svg text {
+    font-family: 'Comic Sans MS', 'Comic Sans', cursive;
+  }
+
+  body {
+    @apply bg-peach-50 text-gray-800;
+    overflow-x: hidden;
+  }
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Comic Sans MS', 'Comic Sans', cursive;
+    font-weight: 900;
+  }
+}
+
+@layer utilities {
+  .text-memphis {
+    @apply font-black uppercase tracking-tight drop-shadow-lg;
+  }
+  
+  .shadow-memphis {
+    @apply shadow-lg drop-shadow-lg;
+  }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-20px); }
+}
+
+.animate-float {
+  animation: float 3s ease-in-out infinite;
+}
+
+@keyframes confetti-fall {
+  0% {
+    transform: translateY(-10vh) rotate(0deg);
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(110vh) rotate(520deg);
+    opacity: 0;
+  }
+}
+
+@keyframes burst-pulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 0.35;
+  }
+  50% {
+    transform: scale(1.15);
+    opacity: 0.5;
+  }
+}
+
+.group-burst {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: min(80vw, 520px);
+  height: min(80vw, 520px);
+  border-radius: 9999px;
+  background: radial-gradient(circle, rgba(253, 224, 71, 0.35) 0%, rgba(251, 191, 36, 0.12) 45%, transparent 70%);
+  animation: burst-pulse 2.8s ease-in-out infinite;
+}
+
+.confetti-piece {
+  position: absolute;
+  top: -8vh;
+  width: 10px;
+  height: 18px;
+  border-radius: 2px;
+  animation-name: confetti-fall;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+  background: linear-gradient(135deg, #60a5fa, #34d399);
+  opacity: 0.9;
+}
+
+.confetti-piece:nth-child(odd) {
+  background: linear-gradient(135deg, #f59e0b, #f97316);
+}
+
+.confetti-piece:nth-child(3n) {
+  background: linear-gradient(135deg, #a78bfa, #60a5fa);
+}
+
+@keyframes ocean-drift {
+  0% { background-position: 0 0, 0 0, 0 0, 0 0, 0 0; }
+  100% { background-position: 280px 120px, -220px 140px, 180px 80px, -140px 110px, 0 0; }
+}
+
+@keyframes path-drift {
+  0% { stroke-dashoffset: 0; }
+  100% { stroke-dashoffset: -84; }
+}
+
+@keyframes flag-wave {
+  0%, 100% { transform: skewY(0deg); }
+  50% { transform: skewY(-2deg); }
+}
+
+@keyframes sparkle-pop {
+  0%, 100% { opacity: 0.28; transform: scale(0.85); }
+  50% { opacity: 0.95; transform: scale(1.08); }
+}
+
+@keyframes whale-bob {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-9px); }
+}
+
+@keyframes cloud-drift {
+  0%, 100% { transform: translateX(0); }
+  50% { transform: translateX(14px); }
+}
+
+.lesson-map-screen {
+  min-height: 100vh;
+  width: 100%;
+  overflow-x: clip;
+  background:
+    radial-gradient(circle at 14% 8%, rgba(255, 255, 255, 0.86), transparent 19rem),
+    radial-gradient(circle at 86% 2%, rgba(255, 255, 255, 0.62), transparent 17rem),
+    linear-gradient(180deg, #c8f3ff 0%, #56d2f1 25%, #10aee0 66%, #058fd1 100%);
+}
+
+.map-stage-shell {
+  max-width: 100%;
+}
+
+.map-stage {
+  position: relative;
+  transform-origin: top left;
+}
+
+.ocean-water {
+  background:
+    radial-gradient(ellipse at 19% 15%, rgba(255, 255, 255, 0.28), transparent 22%),
+    radial-gradient(ellipse at 72% 33%, rgba(255, 255, 255, 0.22), transparent 26%),
+    radial-gradient(ellipse at 44% 74%, rgba(255, 255, 255, 0.15), transparent 29%),
+    repeating-radial-gradient(ellipse at 18% 30%, rgba(255, 255, 255, 0.16) 0 2px, transparent 3px 74px),
+    repeating-radial-gradient(ellipse at 82% 56%, rgba(5, 128, 184, 0.08) 0 2px, transparent 3px 90px),
+    linear-gradient(180deg, #3fd0f1 0%, #15b8e5 42%, #08a2dc 72%, #058cd0 100%);
+  animation: ocean-drift 24s linear infinite;
+}
+
+.ocean-water::before,
+.ocean-water::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.ocean-water::before {
+  background:
+    radial-gradient(ellipse at 12% 29%, rgba(221, 250, 255, 0.55), transparent 5rem),
+    radial-gradient(ellipse at 80% 51%, rgba(221, 250, 255, 0.38), transparent 6rem),
+    radial-gradient(ellipse at 38% 64%, rgba(221, 250, 255, 0.32), transparent 7rem),
+    radial-gradient(ellipse at 57% 18%, rgba(255, 255, 255, 0.16), transparent 13rem);
+  mix-blend-mode: screen;
+}
+
+.ocean-water::after {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.3), transparent 12rem),
+    radial-gradient(circle at 50% 38%, rgba(0, 78, 128, 0.1), transparent 18rem);
+}
+
+.map-path-dashes {
+  filter: drop-shadow(0 8px 8px rgba(4, 105, 155, 0.22)) drop-shadow(0 0 8px rgba(255, 255, 255, 0.75));
+  animation: path-drift 3.8s linear infinite;
+}
+
+.lesson-island .island-flag {
+  transform-box: fill-box;
+  transform-origin: left center;
+  animation: flag-wave 1.7s ease-in-out infinite;
+}
+
+.lesson-island.current {
+  filter: drop-shadow(0 0 24px rgba(255, 232, 91, 0.82));
+}
+
+.lesson-island.locked {
+  cursor: not-allowed;
+}
+
+.lesson-node {
+  transform: translate(-50%, -50%);
+  transform-origin: center;
+}
+
+.map-sparkle {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: sparkle-pop 2.8s ease-in-out infinite;
+}
+
+.whale-scene {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.whale-bob {
+  animation: whale-bob 3.6s ease-in-out infinite;
+}
+
+.map-cloud {
+  position: absolute;
+  z-index: 1;
+  width: 128px;
+  height: 48px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow:
+    27px -20px 0 11px rgba(255, 255, 255, 0.92),
+    66px -10px 0 5px rgba(255, 255, 255, 0.85),
+    -20px -10px 0 9px rgba(255, 255, 255, 0.82),
+    18px 12px 0 -4px rgba(210, 244, 255, 0.7);
+  filter: drop-shadow(0 10px 12px rgba(47, 145, 190, 0.15));
+  animation: cloud-drift 6s ease-in-out infinite;
+}
+
+.map-cloud-left {
+  left: -38px;
+  top: 92px;
+}
+
+.map-cloud-right {
+  right: -42px;
+  top: 26px;
+  transform: scale(0.88);
+  animation-delay: -2s;
+}
+
+.map-cloud-low {
+  left: -52px;
+  bottom: 110px;
+  transform: scale(0.78);
+  animation-delay: -3.5s;
+}
+
+.map-cloud-bottom {
+  left: 82px;
+  bottom: 245px;
+  transform: scale(0.84);
+  animation-delay: -1.3s;
+}
+
+.mini-island {
+  position: absolute;
+  z-index: 2;
+  width: 132px;
+  height: 58px;
+  border-radius: 50%;
+  background:
+    radial-gradient(ellipse at 34% 32%, #fff0a8 0 17%, transparent 18%),
+    linear-gradient(180deg, #f5d875 0%, #d39f4f 72%, #b88342 100%);
+  box-shadow:
+    0 0 0 9px rgba(203, 249, 255, 0.78),
+    0 0 24px 12px rgba(83, 211, 242, 0.35),
+    0 14px 20px rgba(5, 104, 153, 0.22);
+}
+
+.mini-island::before,
+.mini-island::after {
+  content: "";
+  position: absolute;
+  bottom: 7px;
+  width: 30px;
+  height: 23px;
+  border-radius: 50%;
+  background: #a79268;
+  box-shadow: inset 0 4px 0 rgba(255, 255, 255, 0.18);
+}
+
+.mini-island::before {
+  left: 10px;
+}
+
+.mini-island::after {
+  right: 12px;
+}
+
+.mini-island-grass {
+  position: absolute;
+  left: 31px;
+  top: 8px;
+  width: 62px;
+  height: 30px;
+  border-radius: 50%;
+  background: linear-gradient(180deg, #62d54d, #40a93d);
+  box-shadow: 22px 3px 0 -10px #3aa936, -18px 4px 0 -8px #55c946;
+}
+
+.mini-island-grass::before {
+  content: "";
+  position: absolute;
+  left: 38px;
+  top: -24px;
+  width: 7px;
+  height: 36px;
+  border-radius: 999px;
+  background: #8c5528;
+  transform: rotate(9deg);
+  box-shadow: inset 2px 0 0 rgba(255, 255, 255, 0.25);
+}
+
+.mini-island-grass::after {
+  content: "";
+  position: absolute;
+  left: 25px;
+  top: -37px;
+  width: 48px;
+  height: 34px;
+  background:
+    radial-gradient(ellipse at 50% 100%, #138735 0 12%, transparent 13%),
+    conic-gradient(from 205deg at 50% 88%, transparent 0 10deg, #28b84b 10deg 44deg, transparent 44deg 69deg, #35cd58 69deg 110deg, transparent 110deg 144deg, #1fae43 144deg 185deg, transparent 185deg 217deg, #35cd58 217deg 252deg, transparent 252deg 360deg);
+  filter: drop-shadow(0 2px 0 rgba(9, 110, 45, 0.5));
+}
+
+.mini-island-large {
+  transform: scale(1.22);
+}
+
+.sea-rock {
+  position: absolute;
+  z-index: 2;
+  width: 40px;
+  height: 26px;
+  border-radius: 50% 48% 45% 52%;
+  background: linear-gradient(145deg, #c0ad7a, #8f805f);
+  box-shadow:
+    0 0 0 5px rgba(198, 245, 255, 0.62),
+    0 9px 13px rgba(5, 104, 153, 0.24),
+    inset 7px 6px 0 rgba(255, 255, 255, 0.2);
+}
+
+.sea-rock-small {
+  width: 27px;
+  height: 18px;
+  opacity: 0.82;
+}
+
+.group-one-screen {
+  background:
+    radial-gradient(circle at 18% 8%, rgba(255, 255, 255, 0.48), transparent 20rem),
+    linear-gradient(180deg, #b9edff 0%, #2bc0ed 42%, #0799d8 100%);
+}
+
+.group-one-map {
+  box-shadow: 0 0 40px rgba(5, 104, 153, 0.18);
+}
+
+.group-one-header {
+  padding-top: clamp(0.25rem, 1vw, 0.75rem);
+}
+
+.group-one-back {
+  padding: clamp(0.25rem, 0.8vw, 0.45rem);
+  font-size: clamp(1rem, 2.5vw, 1.65rem);
+  font-weight: 900;
+  line-height: 1;
+}
+
+.group-one-back-icon {
+  width: clamp(1.15rem, 2.6vw, 1.75rem);
+  height: clamp(1.15rem, 2.6vw, 1.75rem);
+}
+
+.group-one-stars {
+  min-width: clamp(5.2rem, 12.8vw, 8.3rem);
+  height: clamp(3.05rem, 5.2vw, 3.95rem);
+  padding: 0 clamp(0.8rem, 1.9vw, 1.35rem);
+  font-size: clamp(1.2rem, 2.7vw, 1.75rem);
+}
+
+.group-one-star-icon {
+  width: clamp(1.45rem, 3vw, 2rem);
+  height: clamp(1.45rem, 3vw, 2rem);
+}
+
+.group-one-progress-card {
+  border-radius: clamp(1rem, 2.8vw, 1.75rem);
+  padding: clamp(1rem, 2.6vw, 1.65rem);
+}
+
+.group-one-progress-card h1 {
+  font-size: clamp(1.5rem, 3.2vw, 2rem);
+}
+
+.group-one-progress-card p,
+.group-one-progress-card div {
+  font-size: clamp(0.82rem, 1.75vw, 1rem);
+}
+
+.group-one-lesson-zone {
+  border-radius: 45%;
+}
+
+.group-one-lesson-zone.is-current {
+  animation: group-one-current-pulse 1.8s ease-in-out infinite;
+}
+
+.group-one-lesson-zone.is-locked {
+  cursor: not-allowed;
+}
+
+.group-one-lesson-star {
+  width: clamp(0.75rem, 1.9vw, 1.25rem);
+  height: clamp(0.75rem, 1.9vw, 1.25rem);
+}
+
+.group-one-lock-icon {
+  width: clamp(1.15rem, 3vw, 2.1rem);
+  height: clamp(1.15rem, 3vw, 2.1rem);
+}
+
+.group-one-bottom-actions {
+  padding: clamp(0.7rem, 1.7vw, 1rem);
+}
+
+.group-one-bottom-actions button {
+  min-height: clamp(3.3rem, 5.3vw, 4.7rem);
+  padding: 0 clamp(0.6rem, 2vw, 1.2rem);
+  font-size: clamp(0.9rem, 2.2vw, 1.35rem);
+  line-height: 1.1;
+}
+
+.group-one-action-icon {
+  width: clamp(1.05rem, 2.6vw, 1.75rem);
+  height: clamp(1.05rem, 2.6vw, 1.75rem);
+  flex: 0 0 auto;
+}
+
+@keyframes group-one-current-pulse {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-0.45rem);
+  }
+}
+
+@media (min-width: 768px) {
+  .map-cloud {
+    width: 154px;
+    height: 56px;
+  }
+}
+
+@media (max-width: 640px) {
+  .group-one-bottom-actions {
+    gap: 0.75rem;
+    border-radius: 1.25rem;
+  }
+
+  .group-one-bottom-actions button {
+    gap: 0.45rem;
+    border-radius: 1rem;
+  }
+}
+
+@media (max-width: 520px) {
+  .map-cloud {
+    width: 104px;
+    height: 40px;
+  }
+
+  .map-cloud-left {
+    left: -62px;
+    top: 112px;
+  }
+
+  .map-cloud-right {
+    right: -66px;
+    top: 36px;
+  }
+
+  .mini-island {
+    transform: scale(0.78);
+  }
+
+  .mini-island-large {
+    transform: scale(0.9);
+  }
+
+  .sea-rock {
+    transform: scale(0.78);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ocean-water,
+  .lesson-island svg path,
+  .map-sparkle,
+  .whale-bob,
+  .map-cloud,
+  .map-path-dashes,
+  .group-one-lesson-zone.is-current {
+    animation: none !important;
+  }
+}

@@ -1,0 +1,5 @@
+{
+  "name": "Phonics Adventure",
+  "description": "An interactive CVC blending and phonics learning platform for kids.",
+  "requestFramePermissions": ["microphone"]
+}
