@@ -11,6 +11,7 @@
     "start": "tsx server.ts",
     "build": "vite build",
     "preview": "vite preview",
+    "preview:pages": "node ./scripts/serve-pages-preview.mjs",
     "clean": "rimraf dist",
     "lint": "tsc --noEmit",
     "images:check": "node ./scripts/check-images.mjs",

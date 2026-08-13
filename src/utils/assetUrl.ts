@@ -1,5 +1,6 @@
 const rawAssetBaseUrl = import.meta.env.VITE_ASSET_BASE_URL?.trim() ?? '';
 const rawAssetVersion = import.meta.env.VITE_ASSET_VERSION?.trim() ?? '20260724-2';
+const appBasePath = (import.meta.env.BASE_URL || '/').replace(/\/+$/, '');
 
 export const ASSET_BASE_URL = rawAssetBaseUrl.replace(/\/+$/, '');
 export const ASSET_VERSION = rawAssetVersion;
@@ -20,6 +21,8 @@ export function assetUrl(path: string) {
   }
 
   const normalizedPath = path.startsWith('/') ? path : `/${path}`;
-  const resolvedPath = ASSET_BASE_URL ? `${ASSET_BASE_URL}${normalizedPath}` : normalizedPath;
+  const resolvedPath = ASSET_BASE_URL
+    ? `${ASSET_BASE_URL}${normalizedPath}`
+    : `${appBasePath}${normalizedPath}`;
   return versionedMediaPath(resolvedPath);
 }

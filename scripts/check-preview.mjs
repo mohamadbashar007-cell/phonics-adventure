@@ -28,7 +28,7 @@ try {
     loginVisible,
     groupCount,
     disabledGroups,
-    path: new URL(page.url()).pathname,
+    route: new URL(page.url()).hash,
     lockedLessons: await page.locator('button[aria-label^="Locked lesson"]').count(),
     openLessons: await page.locator('button[aria-label^="Start lesson"]').count(),
     pageErrors,
@@ -42,7 +42,7 @@ try {
     result.disabledGroups > 0 ||
     result.lockedLessons > 0 ||
     result.openLessons === 0 ||
-    result.path !== '/group/2' ||
+    result.route !== '#/group/2' ||
     result.pageErrors.length > 0
   ) {
     process.exitCode = 1;
