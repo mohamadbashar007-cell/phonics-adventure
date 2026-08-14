@@ -238,7 +238,6 @@ export default function LessonEngine({ groupId, letter, onComplete, onExit }: Le
                 letter={letter}
                 exercise={letter.exercises?.[exerciseIndex]}
                 exerciseNumber={exerciseIndex + 1}
-                totalExercises={letter.exercises?.length || 1}
                 preserveLetterCase={groupId === 7}
                 onComplete={handleChooseComplete}
               />

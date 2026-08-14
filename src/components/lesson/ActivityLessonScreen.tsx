@@ -6,7 +6,6 @@ import { audioService } from '../../services/audioService';
 import { soundEffects } from '../../services/soundEffects';
 import { getVocabularyImagePath, handleImageError } from '../../utils/imagePaths';
 import { assetUrl } from '../../utils/assetUrl';
-import { useProgressStore } from '../../lib/store';
 import { celebrateCorrectAnswer } from '../../utils/correctAnswerCelebration';
 
 interface ActivityLessonScreenProps {
@@ -28,6 +27,7 @@ type Step = {
   prompt: string;
   instruction?: string;
   audioText?: string;
+  imageAudioText?: string;
   options?: OptionValue[];
   correctAnswer?: string;
   image?: string;
@@ -52,14 +52,6 @@ type BlendTile = {
   letter: string;
 };
 
-const ACTIVITY_TYPE_LABELS: Record<string, string> = {
-  SAY_TAP: 'Sound Match',
-  ODD_OUT: 'Picture Match',
-  LISTEN: 'Listen',
-  TRACE: 'Trace',
-  QUIZ: 'Quiz',
-};
-
 const BALLOON_DISTRACTORS = [
   's', 'a', 't', 'i', 'p', 'n', 'c', 'k', 'e', 'h', 'r', 'm', 'd', 'g', 'o', 'u', 'l', 'f', 'b', 'j', 'z', 'w', 'v', 'y', 'x', 'q',
 ];
@@ -76,6 +68,13 @@ const BALLOON_STYLES = [
 
 const BALLOON_VERTICAL_LANES = ['9%', '20%', '31%', '41%', '59%', '70%', '81%'];
 const BALLOON_ENTRY_DELAYS = [0, 0.15, 0.3, 0.45, 0.6, 0.75, 0.9];
+const BLEND_DISTRACTOR_COUNT = 2;
+const SYLLABLE_CHOICE_STYLES = [
+  'from-violet-500 via-purple-500 to-fuchsia-500 shadow-purple-300/60',
+  'from-sky-400 via-cyan-500 to-blue-600 shadow-cyan-300/60',
+  'from-amber-400 via-orange-500 to-rose-500 shadow-orange-300/60',
+  'from-emerald-400 via-teal-500 to-cyan-600 shadow-emerald-300/60',
+];
 
 const WORD_EMOJI_MAP: Record<string, string> = {
   sun: '\u{2600}\u{FE0F}',
@@ -250,7 +249,15 @@ function buildBalloonOptions(question: any, questionIndex: number): BalloonOptio
 }
 
 function createBlendTiles(word: string): BlendTile[] {
-  const tiles = Array.from(word).map((letter, index) => ({ id: `${index}-${letter}`, letter }));
+  const answerLetters = Array.from(word);
+  const answerLetterKeys = new Set(answerLetters.map((letter) => letter.toLowerCase()));
+  const distractorLetters = BALLOON_DISTRACTORS
+    .filter((letter) => !answerLetterKeys.has(letter.toLowerCase()))
+    .slice(0, BLEND_DISTRACTOR_COUNT);
+  const tiles = [
+    ...answerLetters.map((letter, index) => ({ id: `answer-${index}-${letter}`, letter })),
+    ...distractorLetters.map((letter, index) => ({ id: `distractor-${index}-${letter}`, letter })),
+  ];
   if (tiles.length < 2) return tiles;
 
   const shuffled = [...tiles];
@@ -348,6 +355,7 @@ function buildSteps(activity: any): Step[] {
       prompt: q.prompt || instruction || 'Look at the picture and tap on the first sound',
       correctAnswer: q.correctAnswer,
       image: q.picture?.image,
+      imageAudioText: q.picture?.word,
       balloons: buildBalloonOptions(q, questionIndex),
     }));
   }
@@ -363,7 +371,9 @@ function buildSteps(activity: any): Step[] {
         : instruction,
       prompt: soundTarget
         ? `Which word has the "${soundTarget}" sound?`
-        : q.prompt || activity.prompt || instruction || 'Choose the correct answer',
+        : type === 'TAP_SYLLABLE'
+          ? 'Listen and tap'
+          : q.prompt || activity.prompt || instruction || 'Choose the correct answer',
       options: dedupeOptions(rawOptions),
       desiredOptionCount: rawOptions.length,
       correctAnswer: q.correctAnswer,
@@ -386,7 +396,6 @@ export default function ActivityLessonScreen({ letter, preserveLetterCase = fals
     ),
     [letter],
   );
-  const childName = useProgressStore((state) => state.userName);
   const [activityIndex, setActivityIndex] = useState(0);
   const [stepIndex, setStepIndex] = useState(0);
   const [isLoadingAudio, setIsLoadingAudio] = useState(false);
@@ -397,12 +406,16 @@ export default function ActivityLessonScreen({ letter, preserveLetterCase = fals
   const [matchedSoundWords, setMatchedSoundWords] = useState<Set<string>>(new Set());
   const [activeSoundWord, setActiveSoundWord] = useState('');
   const [poppedBalloonIds, setPoppedBalloonIds] = useState<Set<string>>(new Set());
+  const [balloonViewportHeight, setBalloonViewportHeight] = useState(
+    () => (typeof window === 'undefined' ? 800 : window.innerHeight),
+  );
   const balloonChoiceLockedRef = useRef(false);
   const wrongBalloonLockedRef = useRef(false);
   const poppedBalloonIdsRef = useRef<Set<string>>(new Set());
   const choiceLockedRef = useRef(false);
   const advanceLockedRef = useRef(false);
   const announcedHearCheckRef = useRef('');
+  const announcedImageAudioRef = useRef('');
   const soundMatchTargetRef = useRef<HTMLDivElement>(null);
   const soundMatchOptionRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
   const matchedSoundWordsRef = useRef<Set<string>>(new Set());
@@ -506,10 +519,19 @@ export default function ActivityLessonScreen({ letter, preserveLetterCase = fals
     if (currentStep?.audioText) {
       audioService.preloadPromptAudio(currentStep.audioText);
     }
+    if (currentStep?.imageAudioText) {
+      audioService.preloadPromptAudio(currentStep.imageAudioText);
+    }
     if (currentStep?.mode === 'sound-match') {
       soundMatchOptions.forEach((option) => audioService.preloadPromptAudio(option.value));
     }
   }, [activityIndex, stepIndex, currentStep?.mode]);
+
+  useEffect(() => {
+    const updateBalloonViewportHeight = () => setBalloonViewportHeight(window.innerHeight);
+    window.addEventListener('resize', updateBalloonViewportHeight);
+    return () => window.removeEventListener('resize', updateBalloonViewportHeight);
+  }, []);
 
   const hasData = activities.length > 0 && !!currentStep;
 
@@ -559,6 +581,7 @@ export default function ActivityLessonScreen({ letter, preserveLetterCase = fals
   };
 
   const hearCheckAudioKey = `${letter.id}-${activityIndex}-${stepIndex}-${currentStep?.audioText || ''}`;
+  const imageAudioKey = `${letter.id}-${activityIndex}-${stepIndex}-${currentStep?.imageAudioText || ''}`;
 
   useEffect(() => {
     if (currentActivity?.type !== 'HEAR_CHECK' || !currentStep?.audioText) return;
@@ -571,6 +594,22 @@ export default function ActivityLessonScreen({ letter, preserveLetterCase = fals
 
     return () => window.clearTimeout(timeoutId);
   }, [hearCheckAudioKey, currentActivity?.type]);
+
+  useEffect(() => {
+    if (!currentStep?.imageAudioText || announcedImageAudioRef.current === imageAudioKey) return;
+
+    const timeoutId = window.setTimeout(() => {
+      announcedImageAudioRef.current = imageAudioKey;
+      void audioService.playPrompt(currentStep.imageAudioText!);
+    }, 300);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [imageAudioKey, currentStep?.imageAudioText]);
+
+  const playImageAudio = () => {
+    if (!currentStep?.imageAudioText) return;
+    void audioService.playPrompt(currentStep.imageAudioText);
+  };
 
   const handleChoice = async (choice: string) => {
     if (choiceLockedRef.current) return;
@@ -783,11 +822,8 @@ export default function ActivityLessonScreen({ letter, preserveLetterCase = fals
     );
   }
 
-  const progressLabel = `Activity ${activityIndex + 1}/${activities.length}`;
-  const stepLabel = `Item ${stepIndex + 1}/${steps.length}`;
-  const activityTypeLabel = ACTIVITY_TYPE_LABELS[currentActivity.type];
-  const isOddOut = currentActivity.type === 'ODD_OUT';
   const isHearCheck = currentActivity.type === 'HEAR_CHECK';
+  const isTapSyllable = currentActivity.type === 'TAP_SYLLABLE';
   const isListeningBalloon = currentStep.mode === 'balloon-choice' && !currentStep.image;
 
   return (
@@ -805,7 +841,7 @@ export default function ActivityLessonScreen({ letter, preserveLetterCase = fals
         </motion.div>
       )}
 
-      <AnimatePresence mode="wait" initial={false}>
+      <AnimatePresence mode="wait">
         <motion.div
           key={`${activityIndex}-${stepIndex}`}
           initial={{ opacity: 0, x: 70, scale: 0.98 }}
@@ -815,27 +851,10 @@ export default function ActivityLessonScreen({ letter, preserveLetterCase = fals
           className="relative z-40 flex w-full flex-col items-center"
           aria-live="polite"
         >
-      {!isListeningBalloon && (
-        <div className="relative z-20 mb-6 flex flex-wrap items-center justify-center gap-2">
-          <span className="rounded-full bg-blue-100 px-4 py-1 text-sm font-bold text-blue-700">{progressLabel}</span>
-          <span className="rounded-full bg-purple-100 px-4 py-1 text-sm font-bold text-purple-700">{stepLabel}</span>
-          {activityTypeLabel && <span className="rounded-full bg-yellow-100 px-4 py-1 text-sm font-bold text-yellow-700">{activityTypeLabel}</span>}
-        </div>
-      )}
-
-      {!isListeningBalloon && letter.lessonHeader?.label && <p className="relative z-20 mb-2 text-lg font-bold text-indigo-700">{letter.lessonHeader.label}</p>}
-
-      <h2 className={`relative z-20 mb-2 font-black text-gray-800 ${isHearCheck ? 'text-2xl md:text-3xl' : 'text-2xl md:text-4xl'}`}>
+      <h2 className={`relative z-20 font-black text-gray-800 ${currentStep.sentence ? 'mb-2' : 'mb-6'} ${isHearCheck ? 'text-2xl md:text-3xl' : 'text-2xl md:text-4xl'}`}>
         {displayText(currentStep.prompt)}
       </h2>
-      {!isListeningBalloon && currentStep.sentence && <p className="relative z-20 mb-2 text-xl font-bold text-gray-700">{displayText(currentStep.sentence)}</p>}
-      {!isListeningBalloon && currentStep.instruction && <p className="relative z-20 mb-6 text-base text-gray-600">{displayText(currentStep.instruction)}</p>}
-
-      {isOddOut && (
-        <p className="mb-3 text-sm font-bold text-gray-600 md:text-base">
-          Drag every picture that starts with “{displayText(soundMatchTarget)}” to the letter
-        </p>
-      )}
+      {!isListeningBalloon && currentStep.sentence && <p className="relative z-20 mb-6 text-xl font-bold text-gray-700">{displayText(currentStep.sentence)}</p>}
 
       {currentStep.audioText && (
         <button
@@ -848,7 +867,26 @@ export default function ActivityLessonScreen({ letter, preserveLetterCase = fals
         </button>
       )}
 
-      {currentStep.image && (
+      {currentStep.image && currentStep.imageAudioText && (
+        <button
+          type="button"
+          onClick={playImageAudio}
+          aria-label={`Play ${currentStep.imageAudioText}`}
+          className="relative z-20 mb-6 rounded-2xl bg-white shadow-lg transition-transform hover:scale-105 focus-visible:outline focus-visible:outline-4 focus-visible:outline-blue-400"
+        >
+          <img
+            src={assetUrl(currentStep.image)}
+            alt={displayText(currentStep.imageAudioText)}
+            onError={handleImageError}
+            loading="eager"
+            fetchPriority="high"
+            decoding="async"
+            className="h-40 w-40 rounded-2xl p-3 object-contain"
+          />
+        </button>
+      )}
+
+      {currentStep.image && !currentStep.imageAudioText && (
         <img
           src={assetUrl(currentStep.image)}
           alt="prompt"
@@ -1113,9 +1151,11 @@ export default function ActivityLessonScreen({ letter, preserveLetterCase = fals
                 const isPopped = poppedBalloonIds.has(balloon.id);
                 const style = BALLOON_STYLES[idx % BALLOON_STYLES.length];
                 const movesUp = idx % 2 === 0;
+                const offscreenTop = -Math.max(192, balloonViewportHeight * 0.3);
+                const offscreenBottom = balloonViewportHeight + Math.max(64, balloonViewportHeight * 0.1);
                 const verticalPath = movesUp
-                  ? ['100dvh', '-12rem']
-                  : ['-12rem', '100dvh'];
+                  ? [offscreenBottom, offscreenTop]
+                  : [offscreenTop, offscreenBottom];
 
                 return (
                   <motion.div
@@ -1170,10 +1210,17 @@ export default function ActivityLessonScreen({ letter, preserveLetterCase = fals
 
       {currentStep.mode === 'choice' && (
         <div
-          className={`grid w-full gap-4 ${isHearCheck ? 'max-w-3xl grid-cols-2' : 'max-w-4xl grid-cols-1 md:grid-cols-2'}`}
+          className={`grid w-full ${
+            isHearCheck
+              ? 'max-w-3xl grid-cols-2 gap-4'
+              : isTapSyllable
+                ? 'max-w-2xl grid-cols-2 gap-5 md:gap-8'
+                : 'max-w-4xl grid-cols-1 gap-4 md:grid-cols-2'
+          }`}
         >
           {displayChoiceOptions.map((option, idx) => {
             const normalized = normalizeOption(option, wordImageMap);
+            const syllableStyle = SYLLABLE_CHOICE_STYLES[idx % SYLLABLE_CHOICE_STYLES.length];
             return (
               <motion.button
                 key={`${normalized.value}-${idx}`}
@@ -1181,11 +1228,24 @@ export default function ActivityLessonScreen({ letter, preserveLetterCase = fals
                 initial={{ opacity: 0, y: 18 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.08 + idx * 0.055, duration: 0.22 }}
-                aria-label={isHearCheck ? (normalized.value.toLowerCase() === 'yes' ? 'Yes, correct' : 'No, incorrect') : undefined}
-                className={`rounded-2xl border-4 border-transparent bg-white shadow-lg transition hover:border-blue-200 ${
-                  isHearCheck ? 'flex min-h-32 items-center justify-center p-3 md:min-h-44' : 'p-4 text-left'
-                }`}
+                whileHover={isTapSyllable ? { y: -6, scale: 1.05, rotate: idx % 2 === 0 ? -1 : 1 } : { scale: 1.02 }}
+                whileTap={{ scale: 0.94 }}
+                aria-label={isHearCheck
+                  ? (normalized.value.toLowerCase() === 'yes' ? 'Yes, correct' : 'No, incorrect')
+                  : `Choose ${normalized.label}`}
+                className={isTapSyllable
+                  ? `relative isolate min-h-32 overflow-hidden rounded-[2rem] border-4 border-white/80 bg-gradient-to-br p-4 text-center shadow-2xl ${syllableStyle} md:min-h-40`
+                  : `rounded-2xl border-4 border-transparent bg-white shadow-lg transition hover:border-blue-200 ${
+                    isHearCheck ? 'flex min-h-32 items-center justify-center p-3 md:min-h-44' : 'p-4 text-left'
+                  }`}
               >
+                {isTapSyllable && (
+                  <>
+                    <span className="absolute -right-7 -top-9 -z-10 h-24 w-24 rounded-full bg-white/20" aria-hidden="true" />
+                    <span className="absolute -bottom-10 -left-6 -z-10 h-28 w-28 rounded-full bg-white/15" aria-hidden="true" />
+                    <span className="absolute left-5 top-5 h-3 w-3 rounded-full bg-white/70 shadow-[1.15rem_0_0_rgba(255,255,255,0.35)]" aria-hidden="true" />
+                  </>
+                )}
                 {isHearCheck ? (
                   <span
                     className={`grid h-28 w-28 place-items-center rounded-full border-[6px] shadow-xl md:h-36 md:w-36 ${
@@ -1212,18 +1272,17 @@ export default function ActivityLessonScreen({ letter, preserveLetterCase = fals
                     className="mb-3 h-28 w-full rounded-xl object-contain bg-gray-50 p-2 md:h-36"
                   />
                 ) : null}
-                {!isHearCheck && <p className="text-center text-2xl font-black text-gray-800">{displayText(normalized.label)}</p>}
+                {!isHearCheck && (
+                  <p className={`text-center font-black ${isTapSyllable ? 'text-4xl text-white drop-shadow-md md:text-5xl' : 'text-2xl text-gray-800'}`}>
+                    {displayText(normalized.label)}
+                  </p>
+                )}
               </motion.button>
             );
           })}
         </div>
       )}
 
-      {currentStep.mode === 'choice' && (
-        <div className="mt-8 rounded-2xl bg-yellow-100/80 px-5 py-3 text-sm font-bold text-yellow-800 shadow-sm">
-          {'\u{1F31F}'} You can do it, {childName || 'Superstar'}!
-        </div>
-      )}
         </motion.div>
       </AnimatePresence>
     </div>

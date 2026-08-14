@@ -4,7 +4,6 @@ import { Volume2, Check, X } from 'lucide-react';
 import { audioService } from '../../services/audioService';
 import { soundEffects } from '../../services/soundEffects';
 import { getImageSourceCandidates, getVocabularyImagePath } from '../../utils/imagePaths';
-import { useProgressStore } from '../../lib/store';
 import { preloadImages } from '../../utils/preloadImages';
 import { assetUrl } from '../../utils/assetUrl';
 import { celebrateCorrectAnswer } from '../../utils/correctAnswerCelebration';
@@ -57,7 +56,6 @@ interface ListenAndChooseScreenProps {
 }
 
 export default function ListenAndChooseScreen({ letter, onComplete }: ListenAndChooseScreenProps) {
-  const childName = useProgressStore((state) => state.userName);
   const [selected, setSelected] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
@@ -268,9 +266,6 @@ export default function ListenAndChooseScreen({ letter, onComplete }: ListenAndC
             ))}
           </div>
 
-          <div className="mt-8 rounded-2xl bg-yellow-100/80 px-5 py-3 text-sm font-bold text-yellow-800 shadow-sm">
-            {'\u{1F31F}'} You can do it, {childName || 'Superstar'}!
-          </div>
         </motion.div>
       </AnimatePresence>
     </div>

@@ -43,7 +43,6 @@ export default function GroupExamScreen({ groupId, group, onComplete, onExit }: 
   );
 
   const currentQuestion = examQuestions[currentQuestionIndex];
-  const progress = ((currentQuestionIndex + 1) / examQuestions.length) * 100;
 
   useEffect(() => {
     audioService.warmup();
@@ -103,17 +102,6 @@ export default function GroupExamScreen({ groupId, group, onComplete, onExit }: 
           </button>
         </div>
 
-        {/* Progress Bar */}
-        <div className="bg-white rounded-full h-4 overflow-hidden shadow-md border-2 border-indigo-200">
-          <motion.div
-            initial={{ width: 0 }}
-            animate={{ width: `${progress}%` }}
-            className="h-full bg-gradient-to-r from-indigo-500 to-purple-500"
-          />
-        </div>
-        <p className="text-center text-sm font-bold text-gray-600 mt-2">
-          Question {currentQuestionIndex + 1} of {examQuestions.length}
-        </p>
       </div>
 
       {/* Main Content */}
@@ -124,15 +112,14 @@ export default function GroupExamScreen({ groupId, group, onComplete, onExit }: 
           className="bg-white rounded-3xl p-6 md:p-8 shadow-xl w-full border-4 border-indigo-200"
         >
           <div className="text-center mb-8">
-            <p className="text-lg text-gray-600 font-bold mb-4">Listen carefully:</p>
             <motion.button
               whileHover={{ scale: 1.1 }}
               whileTap={{ scale: 0.9 }}
               onClick={handlePlayAudio}
-              className="mx-auto px-6 py-4 bg-gradient-to-r from-blue-500 to-indigo-500 text-white rounded-full shadow-lg font-bold text-lg flex items-center gap-2 hover:shadow-xl transition-all"
+              aria-label="Play sound"
+              className="mx-auto grid h-20 w-20 place-items-center rounded-full bg-gradient-to-r from-blue-500 to-indigo-500 text-white shadow-lg transition-all hover:shadow-xl"
             >
-              <Volume2 size={24} />
-              Play Sound
+              <Volume2 size={32} />
             </motion.button>
           </div>
 

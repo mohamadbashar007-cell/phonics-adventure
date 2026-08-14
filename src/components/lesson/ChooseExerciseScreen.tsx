@@ -4,7 +4,6 @@ import { Check, X, Volume2, Loader2 } from 'lucide-react';
 import { audioService } from '../../services/audioService';
 import { soundEffects } from '../../services/soundEffects';
 import { handleImageError } from '../../utils/imagePaths';
-import { useProgressStore } from '../../lib/store';
 import { preloadImages } from '../../utils/preloadImages';
 import { assetUrl } from '../../utils/assetUrl';
 import { celebrateCorrectAnswer } from '../../utils/correctAnswerCelebration';
@@ -13,7 +12,6 @@ interface ChooseExerciseScreenProps {
   letter: any;
   exercise: any;
   exerciseNumber: number;
-  totalExercises: number;
   preserveLetterCase?: boolean;
   onComplete: (stars: number) => void;
 }
@@ -22,11 +20,9 @@ export default function ChooseExerciseScreen({
   letter,
   exercise,
   exerciseNumber,
-  totalExercises,
   preserveLetterCase = false,
   onComplete,
 }: ChooseExerciseScreenProps) {
-  const childName = useProgressStore((state) => state.userName);
   const [selected, setSelected] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
@@ -129,10 +125,7 @@ export default function ChooseExerciseScreen({
   return (
     <div className="flex flex-col items-center justify-center min-h-full p-4 md:p-8 text-center relative">
       <div className="mb-8">
-        <span className="px-4 py-2 bg-blue-100 text-blue-600 rounded-full font-bold text-sm">
-          Exercise {exerciseNumber} of {totalExercises}
-        </span>
-        <div className="flex items-center justify-center gap-4 mt-4">
+        <div className="flex items-center justify-center gap-4">
           <h2 className="text-2xl md:text-4xl font-black text-gray-800">{prompt}</h2>
           <button
             onClick={handlePlaySound}
@@ -222,9 +215,6 @@ export default function ChooseExerciseScreen({
         )}
       </AnimatePresence>
 
-      <div className="mt-8 rounded-2xl bg-yellow-100/80 px-5 py-3 text-sm font-bold text-yellow-800 shadow-sm">
-        🌟 You can do it, {childName || 'Superstar'}!
-      </div>
     </div>
   );
 }
