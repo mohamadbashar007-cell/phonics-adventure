@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Volume2, Loader2, Mic, CheckCircle2, XCircle } from 'lucide-react';
+import { Volume2, Loader2, Mic } from 'lucide-react';
 import { audioService } from '../../services/audioService';
 import { soundEffects } from '../../services/soundEffects';
 import { pronunciationService } from '../../services/pronunciationService';
@@ -9,6 +9,7 @@ import { assetUrl } from '../../utils/assetUrl';
 import { getVocabularyAudioPath } from '../../utils/audioPaths';
 import { preloadImages } from '../../utils/preloadImages';
 import { celebrateCorrectAnswer } from '../../utils/correctAnswerCelebration';
+import FeedbackToast from './FeedbackToast';
 
 interface VocabularyScreenProps {
   letter: any;
@@ -175,24 +176,7 @@ export default function VocabularyScreen({ letter, preserveLetterCase = false, o
 
   return (
     <div className="flex flex-col items-center justify-center min-h-full p-4 md:p-8 text-center relative">
-      <AnimatePresence>
-        {feedback && (
-          <motion.div
-            initial={{ opacity: 0, scale: 0.5, y: 50 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.5, y: -50 }}
-            className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50 px-12 py-6 rounded-full text-4xl font-black shadow-2xl ${
-              feedback.type === 'success'
-                ? 'bg-green-500 text-white'
-                : feedback.type === 'warning'
-                ? 'bg-yellow-400 text-gray-900'
-                : 'bg-red-500 text-white'
-            }`}
-          >
-            {feedback.text}
-          </motion.div>
-        )}
-      </AnimatePresence>
+      <FeedbackToast feedback={feedback} />
 
       <h2 className="text-3xl md:text-4xl font-black text-gray-800 mb-8">
         Words starting with '{displayLetter}'
@@ -248,25 +232,6 @@ export default function VocabularyScreen({ letter, preserveLetterCase = false, o
                     {isListening ? <Loader2 className="animate-spin" size={32} /> : <Mic size={32} />}
                   </button>
 
-                  <AnimatePresence>
-                    {feedback && (
-                      <motion.div
-                        initial={{ opacity: 0, scale: 0.5 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        exit={{ opacity: 0, scale: 0.5 }}
-                        className={`flex items-center gap-2 px-4 py-2 rounded-full font-bold ${
-                          feedback.type === 'success'
-                            ? 'bg-green-100 text-green-600'
-                            : feedback.type === 'warning'
-                            ? 'bg-yellow-100 text-yellow-700'
-                            : 'bg-red-100 text-red-600'
-                        }`}
-                      >
-                        {feedback.type === 'success' ? <CheckCircle2 size={20} /> : <XCircle size={20} />}
-                        {feedback.text}
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
                 </div>
                 {isListening && <p className="text-xs text-green-600 font-bold animate-bounce">Listening...</p>}
                 {lastScore !== null && (

@@ -7,6 +7,7 @@ import { handleImageError } from '../../utils/imagePaths';
 import { preloadImages } from '../../utils/preloadImages';
 import { assetUrl } from '../../utils/assetUrl';
 import { celebrateCorrectAnswer } from '../../utils/correctAnswerCelebration';
+import FeedbackToast from './FeedbackToast';
 
 interface ChooseExerciseScreenProps {
   letter: any;
@@ -58,7 +59,7 @@ export default function ChooseExerciseScreen({
 
     setIsLoading(true);
     try {
-      await audioService.speak(prompt);
+      await audioService.playPrompt(prompt);
     } catch (error) {
       console.error('Audio service error in ChooseExerciseScreen:', error);
     } finally {
@@ -124,6 +125,7 @@ export default function ChooseExerciseScreen({
 
   return (
     <div className="flex flex-col items-center justify-center min-h-full p-4 md:p-8 text-center relative">
+      <FeedbackToast feedback={feedback} />
       <div className="mb-8">
         <div className="flex items-center justify-center gap-4">
           <h2 className="text-2xl md:text-4xl font-black text-gray-800">{prompt}</h2>
@@ -188,18 +190,6 @@ export default function ChooseExerciseScreen({
             animate={{ opacity: 1, y: 0, scale: 1 }}
             className="mt-8 flex flex-col items-center gap-4"
           >
-            {feedback && (
-              <div
-                role="status"
-                className={`flex items-center gap-2 rounded-full px-8 py-3 text-2xl font-black text-white shadow-lg ${
-                  feedback.type === 'success' ? 'bg-green-500' : 'bg-red-500'
-                }`}
-              >
-                {feedback.type === 'success' ? <Check size={30} /> : <X size={30} />}
-                {feedback.text}
-              </div>
-            )}
-
             {feedback?.type !== 'error' && (
               <motion.button
                 type="button"

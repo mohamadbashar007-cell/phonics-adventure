@@ -6,6 +6,7 @@ import { soundEffects } from '../../services/soundEffects';
 import { getLetterTrace, type LetterTrace } from '../../data/letterTraces';
 import { SequentialTraceValidator, TraceProgressState, type TracePoint } from '../../utils/sequentialTraceValidator';
 import { celebrateCorrectAnswer } from '../../utils/correctAnswerCelebration';
+import FeedbackToast from './FeedbackToast';
 
 interface TracingScreenProps {
   letter: any;
@@ -88,7 +89,7 @@ export default function TracingScreen({ letter, traceLetters: traceLettersProp, 
   }, [letter.id]);
 
   useEffect(() => {
-    audioService.speak(`Trace the letter ${activeTraceLetter}`);
+    audioService.playPrompt(`Trace the letter ${activeTraceLetter}`);
   }, [activeTraceLetter]);
 
   useEffect(() => {
@@ -232,7 +233,7 @@ export default function TracingScreen({ letter, traceLetters: traceLettersProp, 
     perfectTraceFinishedRef.current = false;
     setIsPerfectTraceComplete(false);
     setIsShowingPerfectTrace(true);
-    void audioService.speak('Excellent tracing!');
+    void audioService.playPrompt('Excellent tracing!');
   };
 
   const handlePerfectTraceComplete = () => {
@@ -478,19 +479,7 @@ export default function TracingScreen({ letter, traceLetters: traceLettersProp, 
         </button>
       </div>
 
-      <div className="mt-5 min-h-[52px] flex items-center justify-center">
-        {feedback && (
-          <motion.div
-            initial={{ opacity: 0, y: 8, scale: 0.95 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            className={`rounded-full px-6 py-2 text-base md:text-lg font-black shadow-lg ${
-              feedback.type === 'success' ? 'bg-green-500 text-white' : 'bg-red-500 text-white'
-            }`}
-          >
-            {feedback.text}
-          </motion.div>
-        )}
-      </div>
+      <FeedbackToast feedback={feedback} />
 
       {canAdvance && (
         <motion.button

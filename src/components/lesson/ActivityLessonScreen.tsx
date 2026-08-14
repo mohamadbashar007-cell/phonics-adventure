@@ -7,6 +7,7 @@ import { soundEffects } from '../../services/soundEffects';
 import { getVocabularyImagePath, handleImageError } from '../../utils/imagePaths';
 import { assetUrl } from '../../utils/assetUrl';
 import { celebrateCorrectAnswer } from '../../utils/correctAnswerCelebration';
+import FeedbackToast from './FeedbackToast';
 
 interface ActivityLessonScreenProps {
   letter: any;
@@ -828,18 +829,7 @@ export default function ActivityLessonScreen({ letter, preserveLetterCase = fals
 
   return (
     <div className="relative flex min-h-full flex-col items-center justify-center overflow-hidden p-4 text-center md:p-8">
-      {feedback && (
-        <motion.div
-          initial={{ opacity: 0, scale: 0.5 }}
-          animate={{ opacity: 1, scale: [0.5, 1.1, 1] }}
-          className={`absolute top-8 z-30 rounded-full px-6 py-2 text-lg font-black text-white ${
-            feedback.type === 'success' ? 'bg-green-500' : 'bg-red-500'
-          }`}
-        >
-          {feedback.type === 'success' ? <Check className="mr-2 inline" size={18} /> : <X className="mr-2 inline" size={18} />}
-          {feedback.text}
-        </motion.div>
-      )}
+      <FeedbackToast feedback={feedback} />
 
       <AnimatePresence mode="wait">
         <motion.div
@@ -1139,12 +1129,6 @@ export default function ActivityLessonScreen({ letter, preserveLetterCase = fals
 
       {currentStep.mode === 'balloon-choice' && (
         <div className="flex w-full flex-col items-center">
-          {currentStep.image && (
-            <p className="relative z-20 rounded-full bg-white/90 px-5 py-2 text-sm font-black text-indigo-700 shadow-sm">
-              Pop the 3 balloons with the first sound
-            </p>
-          )}
-
           {typeof document !== 'undefined' && createPortal(
             <div className="pointer-events-none fixed inset-0 z-30 h-[100dvh] w-screen overflow-hidden">
               {(currentStep.balloons || []).map((balloon, idx) => {
@@ -1202,7 +1186,7 @@ export default function ActivityLessonScreen({ letter, preserveLetterCase = fals
             document.body,
           )}
 
-          <div className={`${isListeningBalloon ? 'relative' : 'absolute bottom-4 left-1/2 -translate-x-1/2'} z-20 rounded-full bg-white px-5 py-2 text-base font-black text-purple-700 shadow-md`} aria-live="polite">
+          <div className="relative z-20 mt-1 rounded-full bg-white px-5 py-2 text-base font-black text-purple-700 shadow-md" aria-live="polite">
             {poppedBalloonIds.size}/3 found
           </div>
         </div>

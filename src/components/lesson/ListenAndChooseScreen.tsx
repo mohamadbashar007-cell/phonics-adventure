@@ -7,6 +7,7 @@ import { getImageSourceCandidates, getVocabularyImagePath } from '../../utils/im
 import { preloadImages } from '../../utils/preloadImages';
 import { assetUrl } from '../../utils/assetUrl';
 import { celebrateCorrectAnswer } from '../../utils/correctAnswerCelebration';
+import FeedbackToast from './FeedbackToast';
 
 const serializeOptions = (options: any[] = []) =>
   options.map((opt) => `${opt?.word ?? ''}|${opt?.image ?? ''}|${opt?.isCorrect ? '1' : '0'}`).join('__');
@@ -136,7 +137,7 @@ export default function ListenAndChooseScreen({ letter, onComplete }: ListenAndC
       setFeedback({ type: 'success', text: 'Excellent! \u{1F389}' });
       soundEffects.playCelebration();
       celebrateCorrectAnswer();
-      void audioService.speak('Excellent!');
+      void audioService.playPrompt('Excellent!');
 
       setTimeout(() => {
         if (questionIndex < listeningSet.length - 1) {
@@ -150,7 +151,7 @@ export default function ListenAndChooseScreen({ letter, onComplete }: ListenAndC
     } else {
       setFeedback({ type: 'error', text: 'Try Again! \u{1F4AA}' });
       soundEffects.playError();
-      void audioService.speak('Try Again');
+      void audioService.playPrompt('Try Again');
 
       setTimeout(() => {
         setSelected(null);
@@ -200,20 +201,7 @@ export default function ListenAndChooseScreen({ letter, onComplete }: ListenAndC
 
   return (
     <div className="flex flex-col items-center justify-center min-h-full p-4 md:p-8 text-center relative">
-      <AnimatePresence>
-        {feedback && (
-          <motion.div
-            initial={{ opacity: 0, scale: 0.5, y: 50 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.5, y: -50 }}
-            className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50 px-12 py-6 rounded-full text-4xl font-black shadow-2xl ${
-              feedback.type === 'success' ? 'bg-green-500 text-white' : 'bg-red-500 text-white'
-            }`}
-          >
-            {feedback.text}
-          </motion.div>
-        )}
-      </AnimatePresence>
+      <FeedbackToast feedback={feedback} />
 
       <h2 className="text-2xl md:text-4xl font-black text-gray-800 mb-8">Listen and choose the right one!</h2>
 

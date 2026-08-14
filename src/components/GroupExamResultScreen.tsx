@@ -18,6 +18,8 @@ export default function GroupExamResultScreen({
   onComplete,
 }: GroupExamResultScreenProps) {
   const addExamScore = useProgressStore((state) => state.addExamScore);
+  const firstExamScore = useProgressStore((state) => state.getExamScore(groupId));
+  const isRetake = React.useRef(Boolean(firstExamScore)).current;
   const passed = score >= PASSING_SCORE;
 
   React.useEffect(() => {
@@ -87,10 +89,17 @@ export default function GroupExamResultScreen({
           transition={{ delay: 0.5 }}
           className="mb-6"
         >
-          <p className="text-lg text-gray-700 font-bold mb-2">Your Score:</p>
+          <p className="text-lg text-gray-700 font-bold mb-2">
+            {isRetake ? 'Practice Score:' : 'Your Score:'}
+          </p>
           <p className={`text-6xl md:text-7xl font-black ${passed ? 'text-green-600' : 'text-red-600'}`}>
             {score}%
           </p>
+          {isRetake && firstExamScore && (
+            <p className="mt-3 font-bold text-indigo-700">
+              Your recorded first score remains {firstExamScore.score}%.
+            </p>
+          )}
           <p className="text-gray-700 font-bold mt-2">
             Passing Score: {PASSING_SCORE}%
           </p>
@@ -103,7 +112,11 @@ export default function GroupExamResultScreen({
           transition={{ delay: 0.6 }}
           className="text-xl text-gray-800 font-bold mb-8"
         >
-          {passed ? (
+          {isRetake ? (
+            <>
+              This was a practice retake. Your first result stays unchanged.
+            </>
+          ) : passed ? (
             <>
               Congratulations! You've unlocked Group {groupId + 1}! 🔓
             </>

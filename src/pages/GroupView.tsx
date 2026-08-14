@@ -7,6 +7,7 @@ import LessonIsland from '@/components/LessonIsland';
 import GroupCompleteScreen from '@/components/GroupCompleteScreen';
 import GroupExamResultScreen from '@/components/GroupExamResultScreen';
 import GroupExamScreen from '@/components/GroupExamScreen';
+import GroupRevisionScreen from '@/components/GroupRevisionScreen';
 import LessonEngine from '@/components/LessonEngine';
 import { useProgressSync } from '@/lib/useProgressSync';
 import { useProgressStore } from '@/lib/store';
@@ -17,7 +18,7 @@ import { assetUrl } from '@/utils/assetUrl';
 import { getGroupMapSource } from '@/utils/groupAssets';
 import curriculum from '../data/curriculum.json';
 
-type ViewMode = 'map' | 'lesson' | 'exam' | 'exam-result' | 'group-complete';
+type ViewMode = 'map' | 'lesson' | 'revision' | 'exam' | 'exam-result' | 'group-complete';
 type IslandTheme = 'snake' | 'apple' | 'tree' | 'hut' | 'palm' | 'rocks';
 
 const MAP_WIDTH = 1024;
@@ -369,7 +370,7 @@ export default function GroupView() {
     }
 
     soundEffects.playClick();
-    setViewMode('exam');
+    setViewMode('revision');
   };
 
   if (!params) return <div>Invalid Route</div>;
@@ -390,6 +391,17 @@ export default function GroupView() {
     );
   }
 
+  if (viewMode === 'revision') {
+    return (
+      <GroupRevisionScreen
+        groupId={groupId}
+        group={group}
+        onComplete={() => setViewMode('exam')}
+        onExit={() => setViewMode('map')}
+      />
+    );
+  }
+
   if (viewMode === 'exam') {
     return <GroupExamScreen groupId={groupId} group={group} onComplete={(score) => { setExamScore(score); setViewMode('exam-result'); }} onExit={() => setViewMode('map')} />;
   }
@@ -403,7 +415,8 @@ export default function GroupView() {
   }
 
   if (imageMapConfig) {
-    const examPassed = progressStore.isGroupExamPassed(groupId);
+    const recordedExamScore = progressStore.getExamScore(groupId);
+    const examPassed = recordedExamScore?.passed ?? false;
     const examUnlocked = devMode || allLettersCompleted;
 
     return (
@@ -524,18 +537,17 @@ export default function GroupView() {
             <button
               type="button"
               onClick={handleStartExam}
-              disabled={examPassed}
               className={`relative flex min-w-0 items-center justify-center gap-3 rounded-2xl font-black text-white shadow-lg transition focus-visible:outline focus-visible:outline-4 focus-visible:outline-blue-500/70 ${
                 examPassed
-                  ? 'cursor-default bg-gradient-to-r from-green-500 to-emerald-500'
+                  ? 'bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600'
                   : examUnlocked
                   ? 'bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800'
                   : 'bg-slate-400'
               }`}
             >
-              {!examUnlocked && !examPassed && <Lock className="group-one-action-icon" strokeWidth={3} />}
-              <span>{examPassed ? 'Completed!' : 'Take Exam'}</span>
-              {examUnlocked && !examPassed && <ArrowRight className="group-one-action-icon" strokeWidth={3} />}
+              {!examUnlocked && <Lock className="group-one-action-icon" strokeWidth={3} />}
+              <span>{recordedExamScore ? 'Retake Exam' : 'Take Exam'}</span>
+              {examUnlocked && <ArrowRight className="group-one-action-icon" strokeWidth={3} />}
             </button>
           </div>
         </main>
@@ -618,28 +630,22 @@ export default function GroupView() {
                 </div>
               ))}
 
-              {(devMode || allLettersCompleted) && !progressStore.isGroupExamPassed(groupId) && (
+              {(devMode || allLettersCompleted) && (
                 <motion.button
                   initial={{ opacity: 0, y: 24 }}
                   animate={{ opacity: 1, y: 0 }}
                   whileTap={{ scale: 0.96 }}
                   onClick={handleStartExam}
-                  className="absolute left-1/2 z-20 flex -translate-x-1/2 items-center gap-3 rounded-full border-4 border-amber-500 bg-gradient-to-r from-yellow-300 to-orange-400 px-7 py-3 text-xl font-black text-slate-800 shadow-2xl"
+                  className={`absolute left-1/2 z-20 flex -translate-x-1/2 items-center gap-3 rounded-full border-4 px-7 py-3 text-xl font-black shadow-2xl ${
+                    progressStore.isGroupExamPassed(groupId)
+                      ? 'border-green-600 bg-gradient-to-r from-green-400 to-emerald-500 text-white'
+                      : 'border-amber-500 bg-gradient-to-r from-yellow-300 to-orange-400 text-slate-800'
+                  }`}
                   style={{ top: mapHeight - 150 }}
                 >
                   <Trophy size={30} />
-                  Take Exam
+                  {progressStore.getExamScore(groupId) ? 'Retake Exam' : 'Take Exam'}
                 </motion.button>
-              )}
-
-              {progressStore.isGroupExamPassed(groupId) && (
-                <div
-                  className="absolute left-1/2 z-20 flex -translate-x-1/2 items-center gap-3 rounded-full border-4 border-green-600 bg-gradient-to-r from-green-400 to-emerald-500 px-7 py-3 text-xl font-black text-white shadow-2xl"
-                  style={{ top: mapHeight - 150 }}
-                >
-                  <Trophy size={30} />
-                  Completed!
-                </div>
               )}
             </div>
           </div>

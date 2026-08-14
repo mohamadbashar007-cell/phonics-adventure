@@ -1,6 +1,8 @@
 import curriculum from '../data/curriculum.json';
+import recordedAudioConfig from '../data/recordedAudioConfig.json';
+import recordedAudioPrompts from '../data/recordedAudioPrompts.json';
 
-const AUDIO_CACHE_VERSION = '20260807-all-lahajati';
+const AUDIO_CACHE_VERSION = '20260815-complete-lahajati';
 
 function withAudioVersion(value: string) {
   if (!value) return '';
@@ -25,13 +27,30 @@ function registerRecordedText(text: string, audio?: string) {
 
 (curriculum.groups || []).forEach((group: any) => {
   (group.letters || []).forEach((letter: any) => {
+    if (recordedAudioConfig.extendedPromptsReady) {
+      registerRecordedText(letter.letter);
+      registerRecordedText(`"${letter.letter}" for:`);
+      registerRecordedText(`Trace the letter ${letter.letter}`);
+    }
+
     (letter.vocabulary || []).forEach((item: any) => {
       registerRecordedText(item.word, item.audio);
     });
   });
 });
 
-const recordedTextKeys = new Set(['word', 'audioText', 'audioWord', 'audioSound', 'audioSyllable']);
+if (recordedAudioConfig.extendedPromptsReady) {
+  recordedAudioPrompts.forEach((prompt) => registerRecordedText(prompt));
+}
+
+const recordedTextKeys = new Set([
+  'word',
+  'audioText',
+  'audioWord',
+  'audioSound',
+  'audioSyllable',
+  ...(recordedAudioConfig.extendedPromptsReady ? ['result'] : []),
+]);
 
 function registerCurriculumRecordedText(value: any) {
   if (!value) return;

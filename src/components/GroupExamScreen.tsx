@@ -1,12 +1,13 @@
-import React, { useMemo, useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
+import { Check, Volume2, X } from 'lucide-react';
 import { audioService } from '@/services/audioService';
 import { soundEffects } from '@/services/soundEffects';
-import { Volume2 } from 'lucide-react';
 import { handleImageError } from '@/utils/imagePaths';
 import { preloadImages } from '@/utils/preloadImages';
 import { assetUrl } from '@/utils/assetUrl';
 import { celebrateCorrectAnswer } from '@/utils/correctAnswerCelebration';
+import FeedbackToast from './lesson/FeedbackToast';
 
 interface GroupExamScreenProps {
   groupId: number;
@@ -15,183 +16,442 @@ interface GroupExamScreenProps {
   onExit: () => void;
 }
 
+type ExamQuestionType = 'listen-image' | 'picture-letter' | 'hear-check' | 'sound-letter' | 'blend';
+
+type ExamOption = {
+  value: string;
+  label: string;
+  image?: string;
+  tone?: 'yes' | 'no';
+};
+
+type ExamQuestion = {
+  id: string;
+  type: ExamQuestionType;
+  prompt: string;
+  audioText?: string;
+  image?: string;
+  options: ExamOption[];
+  correctOptionIndex: number;
+};
+
+const TEXT_OPTION_STYLES = [
+  'from-violet-500 via-purple-500 to-fuchsia-500 shadow-purple-300/50',
+  'from-sky-400 via-cyan-500 to-blue-600 shadow-cyan-300/50',
+  'from-amber-400 via-orange-500 to-rose-500 shadow-orange-300/50',
+  'from-emerald-400 via-teal-500 to-cyan-600 shadow-emerald-300/50',
+];
+
+function uniqueByValue(options: ExamOption[]) {
+  const seen = new Set<string>();
+  return options.filter((option) => {
+    const key = option.value.trim().toLowerCase();
+    if (!key || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function shuffleQuestionOptions(options: ExamOption[], correctValue: string) {
+  const shuffled = [...options];
+  for (let index = shuffled.length - 1; index > 0; index -= 1) {
+    const swapIndex = Math.floor(Math.random() * (index + 1));
+    [shuffled[index], shuffled[swapIndex]] = [shuffled[swapIndex], shuffled[index]];
+  }
+  return { options: shuffled, correctOptionIndex: shuffled.findIndex((option) => option.value === correctValue) };
+}
+
+function letterOptions(group: any, currentLetter: any, offset: number) {
+  const letters = group.letters || [];
+  const currentIndex = letters.findIndex((letter: any) => letter.id === currentLetter.id);
+  const candidates = [
+    currentLetter,
+    letters[(currentIndex + 1 + offset) % letters.length],
+    letters[(currentIndex + 2 + offset) % letters.length],
+  ];
+  return uniqueByValue(candidates.map((letter: any) => ({
+    value: letter.id,
+    label: letter.letter,
+  }))).slice(0, 3);
+}
+
+function makeListenImageQuestion(letter: any, index: number): ExamQuestion | null {
+  const listeningItems = letter.listening || [];
+  const item = listeningItems[index % Math.max(1, listeningItems.length)];
+  if (!item?.options?.length) return null;
+
+  const correctOption = item.options.find((option: any) => option.isCorrect) || item.options[0];
+  const prepared = shuffleQuestionOptions(
+    item.options.map((option: any) => ({ value: option.word, label: option.word, image: option.image })),
+    correctOption.word,
+  );
+  return {
+    id: `${letter.id}-listen-${index}`,
+    type: 'listen-image',
+    prompt: 'Listen and choose the picture',
+    audioText: item.audioText || item.word,
+    ...prepared,
+  };
+}
+
+function makePictureLetterQuestion(group: any, letter: any, index: number): ExamQuestion | null {
+  const correctChooseOption = (letter.choose?.options || []).find((option: any) => option.isCorrect);
+  const item = correctChooseOption || letter.vocabulary?.[index % Math.max(1, letter.vocabulary?.length || 1)];
+  if (!item?.image) return null;
+
+  const prepared = shuffleQuestionOptions(letterOptions(group, letter, index), letter.id);
+  return {
+    id: `${letter.id}-picture-letter-${index}`,
+    type: 'picture-letter',
+    prompt: 'Which sound matches the picture?',
+    audioText: item.word,
+    image: item.image,
+    ...prepared,
+  };
+}
+
+function makeHearCheckQuestion(letter: any, index: number): ExamQuestion | null {
+  const activity = (letter.activities || []).find((item: any) => item.type === 'HEAR_CHECK' && item.items?.length);
+  const item = activity?.items?.[index % activity.items.length];
+  if (!item) return null;
+
+  const correctValue = String(item.answer || (item.isCorrect ? 'yes' : 'no')).toLowerCase();
+  const prepared = shuffleQuestionOptions([
+    { value: 'yes', label: 'Yes', tone: 'yes' },
+    { value: 'no', label: 'No', tone: 'no' },
+  ], correctValue);
+  return {
+    id: `${letter.id}-hear-${index}`,
+    type: 'hear-check',
+    prompt: `Can you hear “${letter.letter}” in the word?`,
+    audioText: item.word,
+    ...prepared,
+  };
+}
+
+function makeSoundLetterQuestion(group: any, letter: any, index: number): ExamQuestion | null {
+  const options = letterOptions(group, letter, index + 1);
+  if (options.length < 2) return null;
+  const prepared = shuffleQuestionOptions(options, letter.id);
+  return {
+    id: `${letter.id}-sound-letter-${index}`,
+    type: 'sound-letter',
+    prompt: 'Listen and tap the matching sound',
+    audioText: letter.letter || letter.id,
+    ...prepared,
+  };
+}
+
+function getBlendItems(group: any) {
+  return (group.letters || []).flatMap((letter: any) =>
+    (letter.activities || [])
+      .filter((activity: any) => activity.type === 'BLEND')
+      .flatMap((activity: any) => activity.items || []),
+  );
+}
+
+function makeBlendQuestion(group: any, letter: any, index: number): ExamQuestion | null {
+  const letterBlendItems = (letter.activities || [])
+    .filter((activity: any) => activity.type === 'BLEND')
+    .flatMap((activity: any) => activity.items || []);
+  const target = letterBlendItems[index % Math.max(1, letterBlendItems.length)];
+  if (!target?.result) return null;
+
+  const distractors = getBlendItems(group)
+    .filter((item: any) => item.result?.toLowerCase() !== target.result.toLowerCase())
+    .slice(index, index + 4)
+    .map((item: any) => ({ value: item.result, label: item.result }));
+  const options = uniqueByValue([{ value: target.result, label: target.result }, ...distractors]).slice(0, 3);
+  if (options.length < 2) return null;
+
+  const prepared = shuffleQuestionOptions(options, target.result);
+  return {
+    id: `${letter.id}-blend-${index}`,
+    type: 'blend',
+    prompt: 'Listen and choose the word',
+    audioText: target.result,
+    ...prepared,
+  };
+}
+
+type QuestionBuilder = (group: any, letter: any, index: number) => ExamQuestion | null;
+
+const QUESTION_BUILDERS: QuestionBuilder[] = [
+  (_group, letter, index) => makeListenImageQuestion(letter, index),
+  (group, letter, index) => makePictureLetterQuestion(group, letter, index),
+  (_group, letter, index) => makeHearCheckQuestion(letter, index),
+  (group, letter, index) => makeSoundLetterQuestion(group, letter, index),
+  (group, letter, index) => makeBlendQuestion(group, letter, index),
+];
+
+export function buildExamQuestions(group: any): ExamQuestion[] {
+  const letters = group?.letters || [];
+  if (!letters.length) return [];
+
+  const questions: ExamQuestion[] = [];
+  const addQuestion = (question: ExamQuestion | null) => {
+    if (!question || question.correctOptionIndex < 0 || questions.some((item) => item.id === question.id)) return false;
+    questions.push(question);
+    return true;
+  };
+
+  letters.forEach((letter: any, index: number) => {
+    const preferredBuilder = QUESTION_BUILDERS[index % QUESTION_BUILDERS.length];
+    const preferred = preferredBuilder(group, letter, index);
+    if (addQuestion(preferred)) return;
+    addQuestion(makeListenImageQuestion(letter, index));
+  });
+
+  const desiredCount = Math.min(12, Math.max(8, letters.length * 2));
+  let attempt = 0;
+  while (questions.length < desiredCount && attempt < desiredCount * 4) {
+    const letterIndex = attempt % letters.length;
+    const letter = letters[letterIndex];
+    const builderIndex = (letterIndex + Math.floor(attempt / letters.length) + 2) % QUESTION_BUILDERS.length;
+    const builder = QUESTION_BUILDERS[builderIndex];
+    const variant = attempt + letters.length;
+    const question = builder(group, letter, variant);
+    if (!addQuestion(question)) addQuestion(makeListenImageQuestion(letter, variant));
+    attempt += 1;
+  }
+
+  return questions;
+}
+
 export default function GroupExamScreen({ groupId, group, onComplete, onExit }: GroupExamScreenProps) {
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
-  const [score, setScore] = useState(0);
+  const [correctAnswers, setCorrectAnswers] = useState(0);
   const [answered, setAnswered] = useState(false);
   const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null);
-  const [animateResult, setAnimateResult] = useState(false);
-
-  if (!group) return <div>Group not found</div>;
-
-  // Create exam questions - one from each letter
-  const examQuestions = useMemo(
-    () =>
-      group.letters
-        .filter((letter: any) => letter.listening && letter.listening.length > 0)
-        .slice(0, 5)
-        .map((letter: any) => {
-          const listeningItem = letter.listening[0];
-          return {
-            word: listeningItem.word,
-            audioText: listeningItem.audioText,
-            options: listeningItem.options,
-            correctOptionIndex: listeningItem.options.findIndex((option: any) => option.isCorrect),
-          };
-        }),
-    [group]
-  );
-
+  const autoplayRef = useRef<number | null>(null);
+  const examQuestions = useMemo(() => buildExamQuestions(group), [group]);
   const currentQuestion = examQuestions[currentQuestionIndex];
 
   useEffect(() => {
+    if (!currentQuestion) return;
     audioService.warmup();
-    preloadImages(currentQuestion?.options?.map((option: any) => option.image) ?? [], { priority: true });
-    if (currentQuestionIndex === 0) {
-      preloadImages(
-        examQuestions.flatMap((question: any) => question.options?.map((option: any) => option.image) ?? []),
-        { defer: false }
-      );
-    }
-    audioService.preloadPromptAudio(currentQuestion?.audioText || currentQuestion?.word);
     const nextQuestion = examQuestions[currentQuestionIndex + 1];
-    audioService.preloadPromptAudio(nextQuestion?.audioText || nextQuestion?.word);
-  }, [currentQuestionIndex, currentQuestion, examQuestions]);
+    preloadImages(
+      [
+        currentQuestion.image,
+        ...currentQuestion.options.map((option) => option.image),
+        nextQuestion?.image,
+        ...(nextQuestion?.options || []).map((option) => option.image),
+      ].filter((image): image is string => Boolean(image)),
+      { priority: true },
+    );
+    if (currentQuestion.audioText) audioService.preloadPromptAudio(currentQuestion.audioText);
+    if (nextQuestion?.audioText) audioService.preloadPromptAudio(nextQuestion.audioText);
+
+    if (autoplayRef.current) window.clearTimeout(autoplayRef.current);
+    if (currentQuestion.audioText) {
+      autoplayRef.current = window.setTimeout(() => {
+        void audioService.playPrompt(currentQuestion.audioText!);
+      }, 350);
+    }
+    return () => {
+      if (autoplayRef.current) window.clearTimeout(autoplayRef.current);
+    };
+  }, [currentQuestion, currentQuestionIndex, examQuestions]);
+
+  if (!group || !currentQuestion) {
+    return (
+      <div className="grid min-h-dvh place-items-center bg-indigo-50 p-6 text-center">
+        <div>
+          <p className="text-2xl font-black text-indigo-900">No exam questions available.</p>
+          <button onClick={onExit} className="mt-5 rounded-full bg-indigo-600 px-7 py-3 font-black text-white">Back</button>
+        </div>
+      </div>
+    );
+  }
+
+  const isCorrect = selectedAnswer === currentQuestion.correctOptionIndex;
+  const displayText = (value: string) => groupId === 7 ? value : value.toLowerCase();
 
   const handleAnswerSelect = (optionIndex: number) => {
+    if (answered) return;
     soundEffects.playClick();
     setSelectedAnswer(optionIndex);
     setAnswered(true);
-    setAnimateResult(true);
+    const answerIsCorrect = optionIndex === currentQuestion.correctOptionIndex;
+    const nextCorrectAnswers = correctAnswers + (answerIsCorrect ? 1 : 0);
 
-    if (optionIndex === currentQuestion.correctOptionIndex) {
+    if (answerIsCorrect) {
       soundEffects.playSuccess();
       celebrateCorrectAnswer();
-      setScore((prev) => prev + 20);
+      setCorrectAnswers(nextCorrectAnswers);
     } else {
       soundEffects.playError();
     }
 
-    setTimeout(() => {
+    window.setTimeout(() => {
       if (currentQuestionIndex < examQuestions.length - 1) {
-        setCurrentQuestionIndex((prev) => prev + 1);
+        setCurrentQuestionIndex((index) => index + 1);
         setSelectedAnswer(null);
         setAnswered(false);
-        setAnimateResult(false);
       } else {
-        onComplete(score + (optionIndex === currentQuestion.correctOptionIndex ? 20 : 0));
+        onComplete(Math.round((nextCorrectAnswers / examQuestions.length) * 100));
       }
-    }, 2000);
+    }, 1400);
   };
 
-  const handlePlayAudio = () => {
-    void audioService.playPrompt(currentQuestion.audioText || currentQuestion.word);
+  const playAudio = () => {
+    if (currentQuestion.audioText) void audioService.playPrompt(currentQuestion.audioText);
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4 md:p-8 flex flex-col">
-      {/* Header */}
-      <div className="max-w-2xl mx-auto w-full mb-6">
-        <div className="flex items-center justify-between mb-4">
-          <h1 className="text-3xl font-black text-indigo-800">Group {groupId} Exam</h1>
-          <button
-            onClick={onExit}
-            className="text-gray-600 hover:text-gray-800 text-2xl font-black"
-          >
-            ✕
-          </button>
+    <div className="flex min-h-dvh flex-col overflow-hidden bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-100 p-4 md:p-7">
+      <FeedbackToast
+        feedback={answered ? {
+          type: isCorrect ? 'success' : 'error',
+          text: isCorrect ? 'Excellent! 🎉' : 'Try Again ❌',
+        } : null}
+      />
+
+      <header className="mx-auto flex w-full max-w-5xl items-center justify-between gap-4">
+        <div>
+          <p className="text-sm font-black uppercase tracking-[0.2em] text-indigo-500">Group {groupId}</p>
+          <h1 className="text-2xl font-black text-indigo-900 md:text-3xl">Final Challenge</h1>
         </div>
-
-      </div>
-
-      {/* Main Content */}
-      <div className="flex-1 flex items-center justify-center max-w-2xl mx-auto w-full">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="bg-white rounded-3xl p-6 md:p-8 shadow-xl w-full border-4 border-indigo-200"
+        <button
+          type="button"
+          onClick={onExit}
+          aria-label="Exit exam"
+          className="grid h-11 w-11 place-items-center rounded-full bg-white text-xl font-black text-slate-600 shadow-lg hover:text-red-500"
         >
-          <div className="text-center mb-8">
-            <motion.button
-              whileHover={{ scale: 1.1 }}
-              whileTap={{ scale: 0.9 }}
-              onClick={handlePlayAudio}
-              aria-label="Play sound"
-              className="mx-auto grid h-20 w-20 place-items-center rounded-full bg-gradient-to-r from-blue-500 to-indigo-500 text-white shadow-lg transition-all hover:shadow-xl"
-            >
-              <Volume2 size={32} />
-            </motion.button>
-          </div>
+          ×
+        </button>
+      </header>
 
-          {/* Options */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <AnimatePresence>
-              {currentQuestion.options.map((option, index) => (
-                <motion.button
-                  key={`${currentQuestionIndex}-${option.word}-${index}`}
-                  initial={{ opacity: 0, scale: 0.9 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  transition={{ delay: index * 0.1 }}
-                  onClick={() => !answered && handleAnswerSelect(index)}
-                  disabled={answered}
-                  className={`relative rounded-2xl overflow-hidden border-4 transition-all transform ${
-                    selectedAnswer === index
-                      ? index === currentQuestion.correctOptionIndex
-                        ? 'border-green-400 scale-105'
-                        : 'border-red-400 scale-105'
-                      : 'border-gray-300 hover:border-indigo-400'
-                  } ${answered ? 'cursor-not-allowed' : 'cursor-pointer'}`}
-                >
-                  {/* Result Overlay */}
-                  {answered && selectedAnswer === index && (
-                    <motion.div
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: animateResult ? 1 : 0 }}
-                      className={`absolute inset-0 flex items-center justify-center text-4xl z-10 ${
-                        index === currentQuestion.correctOptionIndex
-                          ? 'bg-green-400'
-                          : 'bg-red-400'
-                      }`}
-                    >
-                      {index === currentQuestion.correctOptionIndex ? '✓' : '✗'}
-                    </motion.div>
-                  )}
-
-                  {/* Image */}
-                  <img
-                    src={assetUrl(option.image)}
-                    alt={option.word}
-                    loading="eager"
-                    fetchPriority="high"
-                    decoding="async"
-                    onError={handleImageError}
-                    className="w-full h-32 md:h-40 object-contain p-4"
-                  />
-
-                  {/* Label */}
-                  <div className="p-3 bg-gray-50 text-center">
-                    <p className="font-black text-gray-800">
-                      {groupId === 7 ? option.word : String(option.word || '').toLowerCase()}
-                    </p>
-                  </div>
-                </motion.button>
-              ))}
-            </AnimatePresence>
-          </div>
-
-          {answered && (
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="mt-8 text-center"
-            >
-              <p className={`text-2xl font-black ${selectedAnswer === currentQuestion.correctOptionIndex ? 'text-green-600' : 'text-red-600'}`}>
-                {selectedAnswer === currentQuestion.correctOptionIndex ? 'Great! 🎉' : 'Try Again ❌'}
-              </p>
-            </motion.div>
-          )}
-        </motion.div>
+      <div className="mx-auto mt-4 flex w-full max-w-5xl gap-1.5" aria-label="Exam progress">
+        {examQuestions.map((question, index) => (
+          <span
+            key={question.id}
+            className={`h-2 flex-1 rounded-full transition-colors duration-300 ${
+              index < currentQuestionIndex ? 'bg-emerald-400' : index === currentQuestionIndex ? 'bg-indigo-600' : 'bg-white'
+            }`}
+          />
+        ))}
       </div>
+
+      <main className="mx-auto flex w-full max-w-5xl flex-1 items-center justify-center py-5">
+        <AnimatePresence mode="wait">
+          <motion.section
+            key={currentQuestion.id}
+            initial={{ opacity: 0, x: 80, scale: 0.97 }}
+            animate={{ opacity: 1, x: 0, scale: 1 }}
+            exit={{ opacity: 0, x: -80, scale: 0.97 }}
+            transition={{ type: 'spring', stiffness: 260, damping: 26 }}
+            data-question-type={currentQuestion.type}
+            className="w-full rounded-[2.5rem] border-4 border-white/90 bg-white/80 p-5 text-center shadow-2xl backdrop-blur md:p-8"
+          >
+            <h2 className="text-2xl font-black text-slate-800 md:text-4xl">{displayText(currentQuestion.prompt)}</h2>
+
+            <div className="mt-5 flex items-center justify-center gap-4">
+              {currentQuestion.audioText && (
+                <motion.button
+                  type="button"
+                  whileHover={{ scale: 1.08, rotate: -3 }}
+                  whileTap={{ scale: 0.92 }}
+                  onClick={playAudio}
+                  aria-label="Play sound"
+                  className="grid h-20 w-20 shrink-0 place-items-center rounded-full bg-gradient-to-br from-blue-500 to-indigo-700 text-white shadow-xl"
+                >
+                  <Volume2 size={36} />
+                </motion.button>
+              )}
+
+              {currentQuestion.image && (
+                <motion.button
+                  type="button"
+                  whileHover={{ scale: 1.04 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={playAudio}
+                  aria-label={`Play ${currentQuestion.audioText || 'picture'}`}
+                  className="relative rounded-3xl border-4 border-white bg-white p-3 shadow-xl"
+                >
+                  <img
+                    src={assetUrl(currentQuestion.image)}
+                    alt=""
+                    className="h-32 w-36 object-contain md:h-40 md:w-44"
+                    onError={handleImageError}
+                  />
+                  <Volume2 className="absolute bottom-2 right-2 rounded-full bg-indigo-600 p-1 text-white" size={25} />
+                </motion.button>
+              )}
+            </div>
+
+            <div className={`mx-auto mt-7 grid gap-4 md:gap-6 ${
+              currentQuestion.options.length === 2 ? 'max-w-2xl grid-cols-2' : 'max-w-4xl grid-cols-3'
+            }`}>
+              {currentQuestion.options.map((option, index) => {
+                const selected = selectedAnswer === index;
+                const optionIsCorrect = index === currentQuestion.correctOptionIndex;
+                const toneStyle = option.tone === 'yes'
+                  ? 'border-emerald-300 bg-emerald-100 text-emerald-600'
+                  : 'border-rose-300 bg-rose-100 text-rose-600';
+                const textStyle = TEXT_OPTION_STYLES[index % TEXT_OPTION_STYLES.length];
+                const baseOptionStyle = option.tone
+                  ? toneStyle
+                  : option.image
+                    ? 'border-white bg-white'
+                    : `border-white/80 bg-gradient-to-br ${textStyle}`;
+
+                return (
+                  <motion.button
+                    key={`${option.value}-${index}`}
+                    type="button"
+                    initial={{ opacity: 0, y: 24, scale: 0.9 }}
+                    animate={{ opacity: 1, y: 0, scale: selected ? 1.04 : 1 }}
+                    transition={{ delay: index * 0.09, type: 'spring', stiffness: 280, damping: 22 }}
+                    whileHover={!answered ? { y: -7, scale: 1.04 } : undefined}
+                    whileTap={!answered ? { scale: 0.94 } : undefined}
+                    onClick={() => handleAnswerSelect(index)}
+                    disabled={answered}
+                    aria-label={`Choose ${option.label}`}
+                    className={`relative min-h-32 overflow-hidden rounded-[2rem] border-4 shadow-xl transition-colors md:min-h-40 ${baseOptionStyle} ${
+                      selected
+                        ? optionIsCorrect ? '!border-emerald-400 ring-4 ring-emerald-200' : '!border-red-400 ring-4 ring-red-200'
+                        : ''
+                    }`}
+                  >
+                    {option.image ? (
+                      <img
+                        src={assetUrl(option.image)}
+                        alt={option.label}
+                        onError={handleImageError}
+                        className="h-32 w-full object-contain p-3 md:h-40"
+                        loading="eager"
+                        decoding="async"
+                      />
+                    ) : option.tone ? (
+                      <span className="grid min-h-32 place-items-center md:min-h-40">
+                        {option.tone === 'yes' ? <Check size={78} strokeWidth={4} /> : <X size={78} strokeWidth={4} />}
+                      </span>
+                    ) : (
+                      <span className="grid min-h-32 place-items-center px-2 text-2xl font-black text-white drop-shadow-md sm:text-4xl md:min-h-40 md:px-3 md:text-5xl">
+                        {displayText(option.label)}
+                      </span>
+                    )}
+
+                    {selected && (
+                      <motion.span
+                        initial={{ scale: 0 }}
+                        animate={{ scale: 1 }}
+                        className={`absolute right-3 top-3 grid h-10 w-10 place-items-center rounded-full text-white shadow-lg ${
+                          optionIsCorrect ? 'bg-emerald-500' : 'bg-red-500'
+                        }`}
+                      >
+                        {optionIsCorrect ? <Check size={25} strokeWidth={4} /> : <X size={25} strokeWidth={4} />}
+                      </motion.span>
+                    )}
+                  </motion.button>
+                );
+              })}
+            </div>
+          </motion.section>
+        </AnimatePresence>
+      </main>
     </div>
   );
 }

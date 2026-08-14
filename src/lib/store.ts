@@ -116,13 +116,12 @@ export const useProgressStore = create<ProgressState>()(
       
       addExamScore: (score) => set((state) => {
         const existing = state.examScores.find((e) => e.groupId === score.groupId);
-        if (existing && score.score <= existing.score) {
-          return state;
-        }
+        // The first exam result is the official score. Retakes are practice
+        // attempts and must never replace the original score or pass status.
+        if (existing) return state;
+
         return {
-          examScores: existing
-            ? state.examScores.map((e) => (e.groupId === score.groupId ? score : e))
-            : [...state.examScores, score],
+          examScores: [...state.examScores, score],
         };
       }),
       
