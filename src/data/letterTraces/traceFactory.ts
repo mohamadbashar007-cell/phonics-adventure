@@ -52,6 +52,7 @@ function normalizeTraceKey(value: string) {
   const lower = raw.toLowerCase();
   if (lower.startsWith('capital-')) return lower.replace('capital-', '').toUpperCase();
   if (/^[A-Z]+$/.test(raw)) return raw;
+  if (/^[A-Z][a-z]$/.test(raw)) return raw;
   if (/[A-Z]/.test(raw) && raw.includes(' ')) return raw.replace(/[^A-Z]/g, '') || 'S';
   return lower.replace(/[^a-z]/g, '') || 's';
 }

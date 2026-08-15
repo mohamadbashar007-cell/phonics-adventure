@@ -46,7 +46,7 @@ function ListenChoiceImage({ option }: { option: any }) {
       loading="eager"
       fetchPriority="high"
       decoding="async"
-      className="h-40 w-full rounded-2xl object-contain p-2 md:h-48"
+      className="h-[clamp(6rem,24vw,12rem)] w-full rounded-2xl object-contain p-1 sm:p-2"
     />
   );
 }
@@ -63,7 +63,7 @@ export default function ListenAndChooseScreen({ letter, onComplete }: ListenAndC
   const [questionIndex, setQuestionIndex] = useState(0);
   const autoplayTimeoutRef = useRef<number | null>(null);
 
-  const listeningSet = letter.listening || [];
+  const listeningSet = (letter.listening || []).slice(0, 3);
 
   const processedQuestions = useMemo(() => {
     const prepared =
@@ -140,7 +140,7 @@ export default function ListenAndChooseScreen({ letter, onComplete }: ListenAndC
       void audioService.playPrompt('Excellent!');
 
       setTimeout(() => {
-        if (questionIndex < listeningSet.length - 1) {
+        if (questionIndex < processedQuestions.length - 1) {
           setQuestionIndex((prev) => prev + 1);
           setSelected(null);
           setFeedback(null);
@@ -203,7 +203,7 @@ export default function ListenAndChooseScreen({ letter, onComplete }: ListenAndC
     <div className="flex flex-col items-center justify-center min-h-full p-4 md:p-8 text-center relative">
       <FeedbackToast feedback={feedback} />
 
-      <h2 className="text-2xl md:text-4xl font-black text-gray-800 mb-8">Listen and choose the right one!</h2>
+      <h2 className="mb-4 text-2xl font-black text-gray-800 md:mb-8 md:text-4xl">Listen and choose the right one!</h2>
 
       <AnimatePresence mode="wait">
         <motion.div
@@ -219,14 +219,14 @@ export default function ListenAndChooseScreen({ letter, onComplete }: ListenAndC
             whileTap={{ scale: 0.9 }}
             onClick={handlePlaySound}
             disabled={isLoading || feedback !== null}
-            className={`w-24 h-24 md:w-32 md:h-32 rounded-full flex items-center justify-center shadow-2xl mb-12 transition-colors ${
+            className={`mb-6 flex h-20 w-20 items-center justify-center rounded-full shadow-2xl transition-colors md:mb-12 md:h-32 md:w-32 ${
               isLoading ? 'bg-blue-400 text-white animate-pulse' : 'bg-blue-600 text-white hover:bg-blue-700'
             }`}
           >
-            <Volume2 className={`w-12 h-12 md:w-16 md:h-16 ${isLoading ? 'animate-pulse' : ''}`} />
+            <Volume2 className={`h-10 w-10 md:h-16 md:w-16 ${isLoading ? 'animate-pulse' : ''}`} />
           </motion.button>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6 w-full max-w-4xl">
+          <div className="grid w-full max-w-4xl grid-cols-3 gap-2 sm:gap-4 md:gap-6">
             {options.map((option, index) => (
               <motion.button
                 key={index}

@@ -8,9 +8,11 @@ import { getVocabularyImagePath, handleImageError } from '../../utils/imagePaths
 import { assetUrl } from '../../utils/assetUrl';
 import { celebrateCorrectAnswer } from '../../utils/correctAnswerCelebration';
 import FeedbackToast from './FeedbackToast';
+import { formatInitialSoundCharacters, startsWithInitialSoundCharacter } from '../../utils/initialSound';
 
 interface ActivityLessonScreenProps {
   letter: any;
+  activities?: any[];
   preserveLetterCase?: boolean;
   onComplete: (stars: number) => void;
 }
@@ -154,12 +156,6 @@ function optionSignature(option: OptionValue) {
   return String(option.word || option.label || '').trim().toLowerCase();
 }
 
-function startsWithSound(word: string, sound: string) {
-  const normalizedWord = word.toLowerCase().replace(/[^a-z]/g, '');
-  const normalizedSound = sound.toLowerCase().replace(/[^a-z]/g, '');
-  return Boolean(normalizedSound) && normalizedWord.startsWith(normalizedSound);
-}
-
 function dedupeOptions(options: OptionValue[]) {
   const seen = new Set<string>();
   return options.filter((option) => {
@@ -273,14 +269,16 @@ function createBlendTiles(word: string): BlendTile[] {
   return shuffled;
 }
 
-function buildSteps(activity: any): Step[] {
+function buildSteps(activity: any, lessonSound?: string): Step[] {
   const type = activity?.type;
   const instruction = activity?.instruction as string | undefined;
 
   if (type === 'HEAR_CHECK') {
     return (activity.items || []).map((item: any) => ({
       mode: 'choice',
-      prompt: instruction || 'Can you hear the sound in the word?',
+      prompt: lessonSound
+        ? `Does the word start with ${formatInitialSoundCharacters(lessonSound)}?`
+        : 'Does the word start with the target sound?',
       options: ['yes', 'no'],
       correctAnswer: item.answer,
       audioText: item.word,
@@ -386,17 +384,17 @@ function buildSteps(activity: any): Step[] {
   });
 }
 
-export default function ActivityLessonScreen({ letter, preserveLetterCase = false, onComplete }: ActivityLessonScreenProps) {
+export default function ActivityLessonScreen({ letter, activities: activityOverride, preserveLetterCase = false, onComplete }: ActivityLessonScreenProps) {
   const displayText = (value?: string) => {
     const text = String(value || '');
     return preserveLetterCase ? text : text.toLowerCase();
   };
-  const activities = useMemo(
-    () => (letter?.activities || []).filter(
+  const activities = useMemo(() => {
+    if (activityOverride) return activityOverride.filter((activity: any) => !isRevisionIntro(activity));
+    return (letter?.activities || []).filter(
       (activity: any) => !isRevisionIntro(activity) && !isRedundantActivity(activity),
-    ),
-    [letter],
-  );
+    );
+  }, [activityOverride, letter]);
   const [activityIndex, setActivityIndex] = useState(0);
   const [stepIndex, setStepIndex] = useState(0);
   const [isLoadingAudio, setIsLoadingAudio] = useState(false);
@@ -427,7 +425,10 @@ export default function ActivityLessonScreen({ letter, preserveLetterCase = fals
   const activeStepKey = `${activityIndex}-${stepIndex}`;
   const activeStepKeyRef = useRef(activeStepKey);
   activeStepKeyRef.current = activeStepKey;
-  const steps = useMemo(() => buildSteps(currentActivity), [currentActivity]);
+  const steps = useMemo(
+    () => buildSteps(currentActivity, letter?.letter || letter?.id),
+    [currentActivity, letter?.id, letter?.letter],
+  );
   const wordImageMap = useMemo(() => buildWordImageMap(letter), [letter]);
   const preparedOptionsByStep = useMemo(() => {
     const activityAnswers = new Set(
@@ -495,7 +496,7 @@ export default function ActivityLessonScreen({ letter, preserveLetterCase = fals
     return rawTarget.toLowerCase().replace(/[^a-z]/g, '') || rawTarget;
   }, [letter?.id, letter?.letter]);
   const soundMatchAnswers = useMemo(
-    () => soundMatchOptions.filter((option) => startsWithSound(option.value, soundMatchTarget)),
+    () => soundMatchOptions.filter((option) => startsWithInitialSoundCharacter(option.value, soundMatchTarget)),
     [soundMatchOptions, soundMatchTarget],
   );
 
@@ -714,7 +715,7 @@ export default function ActivityLessonScreen({ letter, preserveLetterCase = fals
     );
     if (!wasDroppedOnLetter) return;
 
-    if (!startsWithSound(word, soundMatchTarget)) {
+    if (!startsWithInitialSoundCharacter(word, soundMatchTarget)) {
       setFeedback({ type: 'error', text: 'Try another picture! \u{1F4AA}' });
       soundEffects.playError();
       window.setTimeout(() => setFeedback(null), 750);

@@ -8,6 +8,7 @@ import { preloadImages } from '@/utils/preloadImages';
 import { assetUrl } from '@/utils/assetUrl';
 import { celebrateCorrectAnswer } from '@/utils/correctAnswerCelebration';
 import FeedbackToast from './lesson/FeedbackToast';
+import { formatInitialSoundCharacters, startsWithInitialSoundCharacter } from '@/utils/initialSound';
 
 interface GroupExamScreenProps {
   groupId: number;
@@ -95,8 +96,13 @@ function makeListenImageQuestion(letter: any, index: number): ExamQuestion | nul
 }
 
 function makePictureLetterQuestion(group: any, letter: any, index: number): ExamQuestion | null {
-  const correctChooseOption = (letter.choose?.options || []).find((option: any) => option.isCorrect);
-  const item = correctChooseOption || letter.vocabulary?.[index % Math.max(1, letter.vocabulary?.length || 1)];
+  const lessonSound = letter.letter || letter.id;
+  const correctChooseOption = (letter.choose?.options || []).find(
+    (option: any) => option.isCorrect && startsWithInitialSoundCharacter(option.word, lessonSound),
+  );
+  const item = correctChooseOption || (letter.vocabulary || []).find(
+    (option: any) => startsWithInitialSoundCharacter(option.word, lessonSound),
+  );
   if (!item?.image) return null;
 
   const prepared = shuffleQuestionOptions(letterOptions(group, letter, index), letter.id);
@@ -123,7 +129,7 @@ function makeHearCheckQuestion(letter: any, index: number): ExamQuestion | null 
   return {
     id: `${letter.id}-hear-${index}`,
     type: 'hear-check',
-    prompt: `Can you hear “${letter.letter}” in the word?`,
+    prompt: `Does the word start with ${formatInitialSoundCharacters(letter.letter || letter.id)}?`,
     audioText: item.word,
     ...prepared,
   };

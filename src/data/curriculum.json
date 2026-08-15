@@ -1098,7 +1098,7 @@
                   "isCorrect": false
                 },
                 {
-                  "word": "insect",
+                  "word": "insects",
                   "answer": "yes",
                   "isCorrect": true
                 },
@@ -1462,7 +1462,7 @@
               "instruction": "Can you hear (P) in...?",
               "items": [
                 {
-                  "word": "pin",
+                  "word": "pinwheel",
                   "answer": "yes",
                   "isCorrect": true
                 },
@@ -2303,7 +2303,7 @@
                   "isCorrect": false
                 },
                 {
-                  "word": "pan",
+                  "word": "sun",
                   "answer": "no",
                   "isCorrect": false
                 }
@@ -2674,17 +2674,17 @@
               "instruction": "Can you hear e in the word?",
               "items": [
                 {
-                  "word": "net",
+                  "word": "egg",
                   "answer": "yes",
                   "isCorrect": true
                 },
                 {
-                  "word": "pet",
+                  "word": "elbow",
                   "answer": "yes",
                   "isCorrect": true
                 },
                 {
-                  "word": "neck",
+                  "word": "elephant",
                   "answer": "yes",
                   "isCorrect": true
                 },
@@ -3480,7 +3480,7 @@
                   "isCorrect": false
                 },
                 {
-                  "word": "neck",
+                  "word": "nest",
                   "answer": "no",
                   "isCorrect": false
                 }
@@ -3875,7 +3875,7 @@
                   "isCorrect": false
                 },
                 {
-                  "word": "pen",
+                  "word": "nest",
                   "answer": "no",
                   "isCorrect": false
                 }
@@ -4255,7 +4255,7 @@
                   "isCorrect": true
                 },
                 {
-                  "word": "sad",
+                  "word": "dog",
                   "answer": "yes",
                   "isCorrect": true
                 },
@@ -4556,17 +4556,17 @@
               "instruction": "Listen and decide if you hear /g/ in the word",
               "items": [
                 {
-                  "word": "gas",
+                  "word": "grass",
                   "answer": "yes",
                   "isCorrect": true
                 },
                 {
-                  "word": "tag",
+                  "word": "goat",
                   "answer": "yes",
                   "isCorrect": true
                 },
                 {
-                  "word": "rag",
+                  "word": "gorilla",
                   "answer": "yes",
                   "isCorrect": true
                 },
@@ -4806,8 +4806,8 @@
             "options": [
               {
                 "label": "A",
-                "word": "dog",
-                "image": "/images/phonics/lesson_o_choose_option_A.webp",
+                "word": "on",
+                "image": "/images/vocabulary/on.webp",
                 "isCorrect": true
               },
               {
@@ -4950,17 +4950,17 @@
                   "isCorrect": true
                 },
                 {
-                  "word": "hop",
+                  "word": "orange",
                   "answer": "yes",
                   "isCorrect": true
                 },
                 {
-                  "word": "top",
+                  "word": "octopus",
                   "answer": "yes",
                   "isCorrect": true
                 },
                 {
-                  "word": "cot",
+                  "word": "oil",
                   "answer": "yes",
                   "isCorrect": true
                 },
@@ -5328,17 +5328,12 @@
               "instruction": "Listen and decide if you hear /u/ in the word",
               "items": [
                 {
-                  "word": "us",
-                  "answer": "yes",
-                  "isCorrect": true
-                },
-                {
                   "word": "up",
                   "answer": "yes",
                   "isCorrect": true
                 },
                 {
-                  "word": "nut",
+                  "word": "umbrella",
                   "answer": "yes",
                   "isCorrect": true
                 },
@@ -5348,14 +5343,14 @@
                   "isCorrect": false
                 },
                 {
-                  "word": "mug",
-                  "answer": "yes",
-                  "isCorrect": true
+                  "word": "dog",
+                  "answer": "no",
+                  "isCorrect": false
                 },
                 {
-                  "word": "rug",
-                  "answer": "yes",
-                  "isCorrect": true
+                  "word": "lemon",
+                  "answer": "no",
+                  "isCorrect": false
                 }
               ],
               "source": "ilovepdf_merged.pdf"
@@ -5723,7 +5718,7 @@
               "instruction": "Listen and decide if you hear /l/ in the word",
               "items": [
                 {
-                  "word": "log",
+                  "word": "leg",
                   "answer": "yes",
                   "isCorrect": true
                 },
@@ -5733,7 +5728,7 @@
                   "isCorrect": true
                 },
                 {
-                  "word": "mell",
+                  "word": "lion",
                   "answer": "yes",
                   "isCorrect": true
                 },
@@ -7836,12 +7831,12 @@
                   "isCorrect": true
                 },
                 {
-                  "word": "wet",
+                  "word": "watch",
                   "answer": "yes",
                   "isCorrect": true
                 },
                 {
-                  "word": "win",
+                  "word": "whale",
                   "answer": "yes",
                   "isCorrect": true
                 },
@@ -8630,7 +8625,7 @@
                   "isCorrect": true
                 },
                 {
-                  "word": "yuck",
+                  "word": "yam",
                   "answer": "yes",
                   "isCorrect": true
                 },
@@ -8863,26 +8858,7 @@
           "image": "/images/letters/x.webp",
           "choose": {
             "prompt": "Choose:",
-            "options": [
-              {
-                "label": "A",
-                "word": "fox",
-                "image": "/images/phonics/lesson_x_choose_option_A.webp",
-                "isCorrect": true
-              },
-              {
-                "label": "B",
-                "word": "queen",
-                "image": "/images/phonics/lesson_qu_choose_option_A.webp",
-                "isCorrect": false
-              },
-              {
-                "label": "C",
-                "word": "rain",
-                "image": "/images/phonics/lesson_ai_choose_option_A.webp",
-                "isCorrect": false
-              }
-            ]
+            "options": []
           },
           "listening": [
             {
@@ -8999,39 +8975,6 @@
                   "left": "s",
                   "right": "ix",
                   "result": "six"
-                }
-              ],
-              "source": "ilovepdf_merged.pdf"
-            },
-            {
-              "number": 3,
-              "type": "HEAR_CHECK",
-              "instruction": "Listen and decide if you hear /x/ in the word",
-              "items": [
-                {
-                  "word": "fox",
-                  "answer": "yes",
-                  "isCorrect": true
-                },
-                {
-                  "word": "box",
-                  "answer": "yes",
-                  "isCorrect": true
-                },
-                {
-                  "word": "six",
-                  "answer": "yes",
-                  "isCorrect": true
-                },
-                {
-                  "word": "fix",
-                  "answer": "yes",
-                  "isCorrect": true
-                },
-                {
-                  "word": "yak",
-                  "answer": "no",
-                  "isCorrect": false
                 }
               ],
               "source": "ilovepdf_merged.pdf"
@@ -9402,7 +9345,7 @@
                   "isCorrect": true
                 },
                 {
-                  "word": "quiz",
+                  "word": "quilt",
                   "answer": "yes",
                   "isCorrect": true
                 },
@@ -9663,8 +9606,8 @@
             "options": [
               {
                 "label": "A",
-                "word": "rain",
-                "image": "/images/phonics/lesson_ai_choose_option_A.webp",
+                "word": "apple",
+                "image": "/images/vocabulary/apple.webp",
                 "isCorrect": true
               },
               {
@@ -9902,17 +9845,17 @@
               "instruction": "Can you hear ai in the word?",
               "items": [
                 {
-                  "word": "pain",
+                  "word": "apple",
                   "answer": "yes",
                   "isCorrect": true
                 },
                 {
-                  "word": "rain",
+                  "word": "ant",
                   "answer": "yes",
                   "isCorrect": true
                 },
                 {
-                  "word": "tail",
+                  "word": "igloo",
                   "answer": "yes",
                   "isCorrect": true
                 },
@@ -10058,8 +10001,8 @@
             "options": [
               {
                 "label": "A",
-                "word": "goat",
-                "image": "/images/phonics/lesson_oa_choose_option_A.webp",
+                "word": "on",
+                "image": "/images/vocabulary/on.webp",
                 "isCorrect": true
               },
               {
@@ -10297,17 +10240,17 @@
               "instruction": "Can you hear oa in the word?",
               "items": [
                 {
-                  "word": "goat",
+                  "word": "on",
                   "answer": "yes",
                   "isCorrect": true
                 },
                 {
-                  "word": "boat",
+                  "word": "orange",
                   "answer": "yes",
                   "isCorrect": true
                 },
                 {
-                  "word": "coat",
+                  "word": "apple",
                   "answer": "yes",
                   "isCorrect": true
                 },
@@ -10453,8 +10396,8 @@
             "options": [
               {
                 "label": "A",
-                "word": "pie",
-                "image": "/images/phonics/lesson_ie_choose_option_A.webp",
+                "word": "igloo",
+                "image": "/images/vocabulary/igloo.webp",
                 "isCorrect": true
               },
               {
@@ -10692,17 +10635,17 @@
               "instruction": "Can you hear ie in the word?",
               "items": [
                 {
-                  "word": "pie",
+                  "word": "igloo",
                   "answer": "yes",
                   "isCorrect": true
                 },
                 {
-                  "word": "fries",
+                  "word": "insects",
                   "answer": "yes",
                   "isCorrect": true
                 },
                 {
-                  "word": "tie",
+                  "word": "elephant",
                   "answer": "yes",
                   "isCorrect": true
                 },
@@ -10843,8 +10786,8 @@
             "options": [
               {
                 "label": "A",
-                "word": "bee",
-                "image": "/images/phonics/lesson_ee_choose_option_A.webp",
+                "word": "egg",
+                "image": "/images/vocabulary/egg.webp",
                 "isCorrect": true
               },
               {
@@ -11082,17 +11025,17 @@
               "instruction": "Can you hear ee in the word?",
               "items": [
                 {
-                  "word": "bee",
+                  "word": "egg",
                   "answer": "yes",
                   "isCorrect": true
                 },
                 {
-                  "word": "tree",
+                  "word": "elbow",
                   "answer": "yes",
                   "isCorrect": true
                 },
                 {
-                  "word": "see",
+                  "word": "elephant",
                   "answer": "yes",
                   "isCorrect": true
                 },
@@ -11230,8 +11173,8 @@
             "options": [
               {
                 "label": "A",
-                "word": "cue",
-                "image": "/images/phonics/lesson_ue_choose_option_A.webp",
+                "word": "up",
+                "image": "/images/vocabulary/up.webp",
                 "isCorrect": true
               },
               {
@@ -11469,17 +11412,17 @@
               "instruction": "Can you hear ue in the word?",
               "items": [
                 {
-                  "word": "cue",
+                  "word": "up",
                   "answer": "yes",
                   "isCorrect": true
                 },
                 {
-                  "word": "fuel",
+                  "word": "umbrella",
                   "answer": "yes",
                   "isCorrect": true
                 },
                 {
-                  "word": "duel",
+                  "word": "egg",
                   "answer": "yes",
                   "isCorrect": true
                 },
@@ -11868,12 +11811,12 @@
                   "isCorrect": true
                 },
                 {
-                  "word": "star",
+                  "word": "arrow",
                   "answer": "yes",
                   "isCorrect": true
                 },
                 {
-                  "word": "car",
+                  "word": "rabbit",
                   "answer": "yes",
                   "isCorrect": true
                 },
@@ -12263,7 +12206,7 @@
                   "isCorrect": true
                 },
                 {
-                  "word": "bench",
+                  "word": "hat",
                   "answer": "yes",
                   "isCorrect": true
                 },
@@ -12413,8 +12356,8 @@
             "options": [
               {
                 "label": "A",
-                "word": "house",
-                "image": "/images/phonics/lesson_ou_choose_option_A.webp",
+                "word": "on",
+                "image": "/images/vocabulary/on.webp",
                 "isCorrect": true
               },
               {
@@ -12652,17 +12595,17 @@
               "instruction": "Can you hear ou in the word?",
               "items": [
                 {
-                  "word": "house",
+                  "word": "on",
                   "answer": "yes",
                   "isCorrect": true
                 },
                 {
-                  "word": "shout",
+                  "word": "orange",
                   "answer": "yes",
                   "isCorrect": true
                 },
                 {
-                  "word": "mouth",
+                  "word": "umbrella",
                   "answer": "yes",
                   "isCorrect": true
                 },
@@ -13055,17 +12998,17 @@
                   "isCorrect": true
                 },
                 {
-                  "word": "fish",
+                  "word": "sun",
                   "answer": "yes",
                   "isCorrect": true
                 },
                 {
-                  "word": "house",
+                  "word": "coin",
                   "answer": "no",
                   "isCorrect": false
                 },
                 {
-                  "word": "hen",
+                  "word": "rain",
                   "answer": "no",
                   "isCorrect": false
                 }
@@ -13199,8 +13142,8 @@
             "options": [
               {
                 "label": "A",
-                "word": "coin",
-                "image": "/images/phonics/lesson_oi_choose_option_A.webp",
+                "word": "oil",
+                "image": "/images/vocabulary/oil.webp",
                 "isCorrect": true
               },
               {
@@ -13438,17 +13381,17 @@
               "instruction": "Can you hear oi in the word?",
               "items": [
                 {
-                  "word": "coin",
-                  "answer": "yes",
-                  "isCorrect": true
-                },
-                {
-                  "word": "point",
-                  "answer": "yes",
-                  "isCorrect": true
-                },
-                {
                   "word": "oil",
+                  "answer": "yes",
+                  "isCorrect": true
+                },
+                {
+                  "word": "orange",
+                  "answer": "yes",
+                  "isCorrect": true
+                },
+                {
+                  "word": "igloo",
                   "answer": "yes",
                   "isCorrect": true
                 },
@@ -13910,7 +13853,7 @@
                   "isCorrect": true
                 },
                 {
-                  "word": "moth",
+                  "word": "hat",
                   "answer": "yes",
                   "isCorrect": true
                 },

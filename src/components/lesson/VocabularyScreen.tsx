@@ -178,11 +178,11 @@ export default function VocabularyScreen({ letter, preserveLetterCase = false, o
     <div className="flex flex-col items-center justify-center min-h-full p-4 md:p-8 text-center relative">
       <FeedbackToast feedback={feedback} />
 
-      <h2 className="text-3xl md:text-4xl font-black text-gray-800 mb-8">
+      <h2 className="mb-4 text-3xl font-black text-gray-800 md:mb-8 md:text-4xl">
         Words starting with '{displayLetter}'
       </h2>
 
-      <div className="relative w-full max-w-md h-[400px] md:h-[450px] mb-8">
+      <div className="relative mb-4 h-[min(48dvh,400px)] w-full max-w-md md:mb-8 md:h-[min(55dvh,450px)]">
         <AnimatePresence mode="wait">
           <motion.div
             key={currentIndex}
@@ -198,7 +198,7 @@ export default function VocabularyScreen({ letter, preserveLetterCase = false, o
               loading="eager"
               fetchPriority="high"
               decoding="async"
-              className="w-40 h-40 md:w-48 md:h-48 object-contain rounded-2xl mb-6 shadow-md p-2 bg-white"
+              className="mb-4 h-32 w-32 rounded-2xl bg-white object-contain p-2 shadow-md md:mb-6 md:h-48 md:w-48"
             />
             <div className="flex flex-col items-center gap-4">
               <div className="flex items-center gap-4">

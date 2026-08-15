@@ -75,6 +75,9 @@ export default function TracingScreen({ letter, traceLetters: traceLettersProp, 
   const [isTraceLoading, setIsTraceLoading] = useState(false);
   const [traceError, setTraceError] = useState<string | null>(null);
   const activeTraceLetter = traceLetters[Math.min(traceIndex, traceLetters.length - 1)] || 'a';
+  const activeTraceLabel = activeTraceLetter.length === 2 && /[A-Z][a-z]/.test(activeTraceLetter)
+    ? `${activeTraceLetter[0]} ${activeTraceLetter[1]}`
+    : activeTraceLetter;
   const hasMultipleTraceLetters = traceLetters.length > 1;
   const isLastTraceLetter = traceIndex >= traceLetters.length - 1;
   const canDraw = Boolean(traceData) && !isTraceLoading && !traceError;
@@ -89,8 +92,8 @@ export default function TracingScreen({ letter, traceLetters: traceLettersProp, 
   }, [letter.id]);
 
   useEffect(() => {
-    audioService.playPrompt(`Trace the letter ${activeTraceLetter}`);
-  }, [activeTraceLetter]);
+    audioService.playPrompt(`Trace the letters ${activeTraceLabel}`);
+  }, [activeTraceLabel]);
 
   useEffect(() => {
     let cancelled = false;
@@ -280,7 +283,7 @@ export default function TracingScreen({ letter, traceLetters: traceLettersProp, 
 
   return (
     <div className="flex flex-col items-center justify-center min-h-full p-4 md:p-8 text-center relative">
-      <h2 className="text-2xl md:text-4xl font-black text-gray-800 mb-2">Trace the letter '{activeTraceLetter}'</h2>
+      <h2 className="text-2xl md:text-4xl font-black text-gray-800 mb-2">Trace '{activeTraceLabel}' together</h2>
       <p className="text-lg md:text-xl text-gray-600 mb-2 font-bold">Trace inside the blue letter!</p>
       <p className="text-sm text-gray-500 mb-6 font-semibold">
         {hasMultipleTraceLetters ? `Letter ${traceIndex + 1} of ${traceLetters.length} · ` : ''}
@@ -288,7 +291,7 @@ export default function TracingScreen({ letter, traceLetters: traceLettersProp, 
       </p>
 
       <div className="relative group">
-        <div className="relative w-[min(92vw,380px)] h-[min(92vw,380px)] md:w-[360px] md:h-[360px] lg:w-[400px] lg:h-[400px] bg-white rounded-3xl shadow-2xl border-8 border-dashed border-blue-200 flex items-center justify-center overflow-hidden">
+        <div className="relative flex h-[min(74vw,62dvh,400px)] w-[min(74vw,62dvh,400px)] items-center justify-center overflow-hidden rounded-3xl border-8 border-dashed border-blue-200 bg-white shadow-2xl">
           {traceData && (
             <svg viewBox={`0 0 ${CANVAS_SIZE} ${CANVAS_SIZE}`} className="absolute inset-0 w-full h-full pointer-events-none z-0">
               <path
