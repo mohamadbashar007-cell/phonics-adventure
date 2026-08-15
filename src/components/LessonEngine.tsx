@@ -72,9 +72,20 @@ export default function LessonEngine({ groupId, letter, onComplete, onExit }: Le
   const isCapitalGroup = groupId === 7;
   const activitySections = useMemo(() => getLessonActivitySections(letter), [letter]);
   const visibleActivitySections = useMemo(
-    () => activitySections.filter((section) => (
-      isCapitalGroup ? section.key !== 'tap' : section.key !== 'match'
-    )),
+    () => activitySections
+      .filter((section) => (isCapitalGroup ? section.key !== 'tap' : section.key !== 'match'))
+      .map((section) => {
+        if (!isCapitalGroup) return section;
+        if (section.key === 'blend') return { ...section, label: 'Sentence' };
+        if (section.key === 'segment') {
+          return {
+            ...section,
+            label: 'Blend',
+            activities: convertSegmentActivitiesToBlend(section.activities),
+          };
+        }
+        return section;
+      }),
     [activitySections, isCapitalGroup],
   );
   const hasChooseActivity = true;
@@ -329,6 +340,26 @@ function getTraceLettersForLesson(groupId: number, letter: { id: string; letter:
   return capitalLetters.length
     ? capitalLetters.map((capital) => `${capital}${capital.toLowerCase()}`)
     : [letter.letter || letter.id || 'A'];
+}
+
+function convertSegmentActivitiesToBlend(activities: any[]) {
+  return activities.map((activity) => {
+    if (activity?.type !== 'SEGMENT') return activity;
+
+    return {
+      type: 'BLEND',
+      instruction: 'Blend the sounds together and build the word',
+      items: (activity.questions || []).map((question: any) => {
+        const result = String(question.audioWord || question.audioSyllable || '').trim();
+        const characters = Array.from(result);
+        return {
+          left: characters[0] || '',
+          right: characters.slice(1).join(''),
+          result,
+        };
+      }).filter((item: any) => item.result),
+    };
+  });
 }
 
 function getLessonViewportScale() {

@@ -30,6 +30,7 @@ export default function ChooseExerciseScreen({
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [questionIndex, setQuestionIndex] = useState(0);
   const announcedPromptRef = useRef('');
+  const correctAdvanceTimeoutRef = useRef<number | null>(null);
 
   const chooseData = letter.choose || exercise;
   const quizQuestions = useMemo<any[]>(() => {
@@ -112,10 +113,20 @@ export default function ChooseExerciseScreen({
   }, [options, questionIndex, quizQuestions]);
 
   useEffect(() => {
+    if (correctAdvanceTimeoutRef.current !== null) {
+      window.clearTimeout(correctAdvanceTimeoutRef.current);
+      correctAdvanceTimeoutRef.current = null;
+    }
     setSelected(null);
     setFeedback(null);
     setQuestionIndex(0);
   }, [letter.id, exerciseNumber]);
+
+  useEffect(() => () => {
+    if (correctAdvanceTimeoutRef.current !== null) {
+      window.clearTimeout(correctAdvanceTimeoutRef.current);
+    }
+  }, []);
 
   const handlePlaySound = async () => {
     if (isLoading || feedback !== null) return;
@@ -156,13 +167,24 @@ export default function ChooseExerciseScreen({
   const selectedOption = selected === null ? null : shuffledOptions[selected];
 
   const handleContinue = () => {
-    if (!selectedOption) return;
+    if (!selectedOption || correctAdvanceTimeoutRef.current !== null) return;
 
     if (!feedback) {
       if (selectedOption.isCorrect) {
         setFeedback({ type: 'success', text: formatQuestionText('Correct!') });
         soundEffects.playCelebration();
         celebrateCorrectAnswer();
+        const answeredQuestionIndex = questionIndex;
+        correctAdvanceTimeoutRef.current = window.setTimeout(() => {
+          correctAdvanceTimeoutRef.current = null;
+          if (answeredQuestionIndex < quizQuestions.length - 1) {
+            setQuestionIndex(answeredQuestionIndex + 1);
+            setSelected(null);
+            setFeedback(null);
+            return;
+          }
+          onComplete(1);
+        }, 700);
       } else {
         setFeedback({ type: 'error', text: formatQuestionText('Incorrect!') });
         soundEffects.playError();
@@ -271,7 +293,7 @@ export default function ChooseExerciseScreen({
             animate={{ opacity: 1, y: 0, scale: 1 }}
             className="mt-8 flex flex-col items-center gap-4"
           >
-            {feedback?.type !== 'error' && (
+            {feedback === null && (
               <motion.button
                 type="button"
                 whileHover={{ scale: 1.05 }}

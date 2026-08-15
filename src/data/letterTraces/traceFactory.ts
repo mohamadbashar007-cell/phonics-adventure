@@ -64,19 +64,31 @@ function splitTraceLetters(key: string) {
 
 function composeLetters(letters: string[]): DrawCommand[] {
   const baseWidth = 100;
-  const baseHeight = 140;
+  const isUpperLowerPair =
+    letters.length === 2 && /^[A-Z]$/.test(letters[0]) && /^[a-z]$/.test(letters[1]);
+  const baseHeight = isUpperLowerPair ? 160 : 140;
   const gap = letters.length === 1 ? 0 : letters.length > 2 ? 18 : 30;
-  const totalWidth = letters.length * baseWidth + (letters.length - 1) * gap;
+  const sizeFactors = letters.map((_, index) => (isUpperLowerPair && index === 1 ? 0.68 : 1));
+  const totalWidth =
+    sizeFactors.reduce((width, factor) => width + baseWidth * factor, 0) +
+    (letters.length - 1) * gap;
   const availableWidth = CANVAS_SIZE - PADDING * 2;
   const availableHeight = CANVAS_SIZE - PADDING * 2;
   const scale = Math.min(availableWidth / totalWidth, availableHeight / baseHeight);
   const startX = (CANVAS_SIZE - totalWidth * scale) / 2;
   const startY = (CANVAS_SIZE - baseHeight * scale) / 2;
+  const baselineY = startY + baseHeight * scale;
+  let currentX = startX;
 
   return letters.flatMap((letter, index) => {
     const shape = LETTER_PATHS[letter] ?? LETTER_PATHS[letter.toLowerCase()] ?? LETTER_PATHS.s;
-    const offsetX = startX + index * (baseWidth + gap) * scale;
-    return transformCommands(shape, scale, offsetX, startY);
+    const letterScale = scale * sizeFactors[index];
+    const offsetX = currentX;
+    const offsetY = isUpperLowerPair
+      ? baselineY - baseHeight * letterScale
+      : startY;
+    currentX += (baseWidth * sizeFactors[index] + gap) * scale;
+    return transformCommands(shape, letterScale, offsetX, offsetY);
   });
 }
 

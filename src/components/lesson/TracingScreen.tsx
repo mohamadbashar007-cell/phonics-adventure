@@ -78,6 +78,9 @@ export default function TracingScreen({ letter, traceLetters: traceLettersProp, 
   const activeTraceLabel = activeTraceLetter.length === 2 && /[A-Z][a-z]/.test(activeTraceLetter)
     ? `${activeTraceLetter[0]} ${activeTraceLetter[1]}`
     : activeTraceLetter;
+  const traceInstruction = activeTraceLetter.length > 1
+    ? `Trace '${activeTraceLabel}' together`
+    : `Trace '${activeTraceLabel}'`;
   const hasMultipleTraceLetters = traceLetters.length > 1;
   const isLastTraceLetter = traceIndex >= traceLetters.length - 1;
   const canDraw = Boolean(traceData) && !isTraceLoading && !traceError;
@@ -283,8 +286,9 @@ export default function TracingScreen({ letter, traceLetters: traceLettersProp, 
 
   return (
     <div className="flex flex-col items-center justify-center min-h-full p-4 md:p-8 text-center relative">
-      <h2 className="text-2xl md:text-4xl font-black text-gray-800 mb-2">Trace '{activeTraceLabel}' together</h2>
-      <p className="text-lg md:text-xl text-gray-600 mb-2 font-bold">Trace inside the blue letter!</p>
+      <h2 className="text-2xl md:text-4xl font-black uppercase tracking-wide text-gray-800 mb-1">TRACE</h2>
+      <p className="text-lg md:text-xl text-gray-700 mb-1 font-black">{traceInstruction}</p>
+      <p className="text-base md:text-lg text-gray-600 mb-2 font-bold">Trace inside the blue letter!</p>
       <p className="text-sm text-gray-500 mb-6 font-semibold">
         {hasMultipleTraceLetters ? `Letter ${traceIndex + 1} of ${traceLetters.length} · ` : ''}
         Progress: {isTraceLoading ? '--' : `${(progress * 100).toFixed(0)}%`}
