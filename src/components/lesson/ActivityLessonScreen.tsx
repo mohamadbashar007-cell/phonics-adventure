@@ -171,6 +171,10 @@ function extractSoundTarget(prompt?: string) {
   return match?.[1]?.trim();
 }
 
+function withoutFirstSound(value?: string) {
+  return String(value || '').replace(/\bfirst\s+sound\b/gi, 'sound');
+}
+
 function isRedundantActivity(activity: any) {
   if (activity?.type === 'SEGMENT') return true;
   if (activity?.type !== 'SAY_TAP') return false;
@@ -245,6 +249,26 @@ function buildBalloonOptions(question: any, questionIndex: number): BalloonOptio
   return shuffleItems(balloons);
 }
 
+function getQuestionPicture(question: any) {
+  if (question?.picture?.word || question?.picture?.image) {
+    return {
+      word: String(question.picture.word || question.correctAnswer || question.audioWord || '').trim(),
+      image: question.picture.image as string | undefined,
+    };
+  }
+
+  const correctAnswer = String(question?.correctAnswer || '').trim().toLowerCase();
+  const correctOption = (question?.options || []).find((option: OptionValue) => (
+    optionSignature(option) === correctAnswer
+  ));
+  const normalized = correctOption ? normalizeOption(correctOption, new Map()) : undefined;
+
+  return {
+    word: normalized?.value || String(question?.audioWord || question?.correctAnswer || '').trim(),
+    image: normalized?.image,
+  };
+}
+
 function createBlendTiles(word: string): BlendTile[] {
   const answerLetters = Array.from(word);
   const answerLetterKeys = new Set(answerLetters.map((letter) => letter.toLowerCase()));
@@ -277,8 +301,12 @@ function buildSteps(activity: any, lessonSound?: string): Step[] {
     return (activity.items || []).map((item: any) => ({
       mode: 'choice',
       prompt: lessonSound
-        ? `Does the word start with ${formatInitialSoundCharacters(lessonSound)}?`
-        : 'Does the word start with the target sound?',
+        ? activity.checkMode === 'starts-with'
+          ? `Does the word start with ${formatInitialSoundCharacters(lessonSound)}?`
+          : `Does the word have the ${formatInitialSoundCharacters(lessonSound)} sound?`
+        : activity.checkMode === 'starts-with'
+          ? 'Does the word start with one of the lesson letters?'
+          : 'Does the word have the target sound?',
       options: ['yes', 'no'],
       correctAnswer: item.answer,
       audioText: item.word,
@@ -351,12 +379,34 @@ function buildSteps(activity: any, lessonSound?: string): Step[] {
     return activity.questions.map((q: any, questionIndex: number) => ({
       mode: 'balloon-choice',
       instruction,
-      prompt: q.prompt || instruction || 'Look at the picture and tap on the first sound',
+      prompt: withoutFirstSound(q.prompt || instruction || 'Look at the picture and tap on the sound'),
       correctAnswer: q.correctAnswer,
       image: q.picture?.image,
       imageAudioText: q.picture?.word,
       balloons: buildBalloonOptions(q, questionIndex),
     }));
+  }
+
+  if (type === 'SAY_TAP' && activity.subtype !== 'LISTENING' && activity.questions?.length) {
+    return activity.questions.map((q: any, questionIndex: number) => {
+      const picture = getQuestionPicture(q);
+      const soundTarget = extractSoundTarget(q.prompt) || q.correctAnswer || q.audioSound || '';
+
+      return {
+        mode: 'balloon-choice',
+        instruction,
+        prompt: 'Look, listen, and pop the sound',
+        correctAnswer: soundTarget,
+        image: picture.image,
+        imageAudioText: picture.word,
+        balloons: buildBalloonOptions(
+          // The source question options are picture words (for example, sun/cat).
+          // This activity's balloons must always be letter/sound choices instead.
+          { ...q, options: [], correctAnswer: soundTarget, audioSound: soundTarget },
+          questionIndex,
+        ),
+      };
+    });
   }
 
   return (activity.questions || []).map((q: any) => {
@@ -528,6 +578,18 @@ export default function ActivityLessonScreen({ letter, activities: activityOverr
       soundMatchOptions.forEach((option) => audioService.preloadPromptAudio(option.value));
     }
   }, [activityIndex, stepIndex, currentStep?.mode]);
+
+  // HEAR_CHECK questions can deliberately use a word from another lesson as
+  // the wrong answer (for example, "dog" in A–B–C). Load every question in
+  // the section upfront, rather than beginning that request when it appears.
+  useEffect(() => {
+    activities.forEach((activity) => {
+      if (activity?.type !== 'HEAR_CHECK') return;
+      (activity.items || []).forEach((item: any) => {
+        if (typeof item?.word === 'string') audioService.preloadPromptAudio(item.word);
+      });
+    });
+  }, [activities]);
 
   useEffect(() => {
     const updateBalloonViewportHeight = () => setBalloonViewportHeight(window.innerHeight);

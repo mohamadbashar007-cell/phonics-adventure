@@ -1,5 +1,5 @@
 const SVG_SIZE = 400;
-const GUIDE_FONT_FAMILY = "'Comic Sans MS','Arial Rounded MT Bold','Trebuchet MS',Arial,sans-serif";
+const GUIDE_FONT_FAMILY = "'Phonics Comic Sans','Comic Sans MS',sans-serif";
 
 export interface TracingGuideSpec {
   text: string;

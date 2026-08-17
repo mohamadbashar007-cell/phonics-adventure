@@ -1,8 +1,24 @@
 @import "tailwindcss";
 
+@font-face {
+  font-family: 'Phonics Comic Sans';
+  src: url('./assets/fonts/ComicSansMS-Regular.ttf') format('truetype');
+  font-style: normal;
+  font-weight: 400;
+  font-display: block;
+}
+
+@font-face {
+  font-family: 'Phonics Comic Sans';
+  src: url('./assets/fonts/ComicSansMS-Bold.ttf') format('truetype');
+  font-style: normal;
+  font-weight: 700 900;
+  font-display: block;
+}
+
 @theme {
-  --font-sans: 'Comic Sans MS', 'Comic Sans', cursive;
-  --font-display: 'Comic Sans MS', 'Comic Sans', cursive;
+  --font-sans: 'Phonics Comic Sans', 'Comic Sans MS', sans-serif;
+  --font-display: 'Phonics Comic Sans', 'Comic Sans MS', sans-serif;
 
   --color-peach-50: #FFF5F0;
   --color-peach-100: #FFE5D9;
@@ -27,7 +43,8 @@
   textarea,
   select,
   svg text {
-    font-family: 'Comic Sans MS', 'Comic Sans', cursive;
+    font-family: 'Phonics Comic Sans', 'Comic Sans MS', sans-serif;
+    font-synthesis: none;
   }
 
   body {
@@ -51,7 +68,7 @@
     max-width: 100%;
   }
   h1, h2, h3, h4, h5, h6 {
-    font-family: 'Comic Sans MS', 'Comic Sans', cursive;
+    font-family: 'Phonics Comic Sans', 'Comic Sans MS', sans-serif;
     font-weight: 900;
   }
 }

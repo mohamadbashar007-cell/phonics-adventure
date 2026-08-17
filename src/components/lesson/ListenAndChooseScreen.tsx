@@ -46,7 +46,7 @@ function ListenChoiceImage({ option }: { option: any }) {
       loading="eager"
       fetchPriority="high"
       decoding="async"
-      className="h-[clamp(6rem,24vw,12rem)] w-full rounded-2xl object-contain p-1 sm:p-2"
+      className="h-[clamp(7rem,19dvh,12rem)] w-full rounded-2xl object-contain p-1 sm:p-2 md:h-[clamp(6rem,24vw,12rem)]"
     />
   );
 }
@@ -63,7 +63,10 @@ export default function ListenAndChooseScreen({ letter, onComplete }: ListenAndC
   const [questionIndex, setQuestionIndex] = useState(0);
   const autoplayTimeoutRef = useRef<number | null>(null);
 
-  const listeningSet = (letter.listening || []).slice(0, 3);
+  const listeningSet = useMemo(
+    () => (letter.listening || []).slice(0, 3),
+    [letter.listening],
+  );
 
   const processedQuestions = useMemo(() => {
     const prepared =
@@ -226,7 +229,7 @@ export default function ListenAndChooseScreen({ letter, onComplete }: ListenAndC
             <Volume2 className={`h-10 w-10 md:h-16 md:w-16 ${isLoading ? 'animate-pulse' : ''}`} />
           </motion.button>
 
-          <div className="grid w-full max-w-4xl grid-cols-3 gap-2 sm:gap-4 md:gap-6">
+          <div className="grid w-full max-w-sm grid-cols-1 gap-3 md:max-w-4xl md:grid-cols-3 md:gap-6">
             {options.map((option, index) => (
               <motion.button
                 key={index}
@@ -235,7 +238,7 @@ export default function ListenAndChooseScreen({ letter, onComplete }: ListenAndC
                 whileTap={selected === null ? { scale: 0.95 } : {}}
                 onClick={() => handleSelect(index, option.isCorrect)}
                 disabled={feedback !== null}
-                className={`relative p-4 rounded-3xl shadow-lg transition-all border-4 ${
+                className={`relative w-full rounded-3xl border-4 p-3 shadow-lg transition-all md:p-4 ${
                   selected === index
                     ? option.isCorrect
                       ? 'bg-green-100 border-green-500'

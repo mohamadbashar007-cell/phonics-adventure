@@ -75,6 +75,7 @@ export default function AlphabetTrainScreen({ letter, onComplete }: AlphabetTrai
   const prefersReducedMotion = Boolean(useReducedMotion());
   const viewportRef = useRef<HTMLDivElement>(null);
   const [canContinue, setCanContinue] = useState(false);
+  const [visibleWagonCount, setVisibleWagonCount] = useState(0);
   const lessonLetters = useMemo(() => String(letter?.letter || '').match(/[A-Z]/g) || [], [letter?.letter]);
   const accumulatedLetters = useMemo(() => {
     const lastLetter = lessonLetters.at(-1);
@@ -87,26 +88,51 @@ export default function AlphabetTrainScreen({ letter, onComplete }: AlphabetTrai
 
   useEffect(() => {
     setCanContinue(false);
-    void audioService.playPrompt(
-      isCompleteAlphabet ? 'The alphabet train is complete' : `Our letter train now reaches ${accumulatedLetters.at(-1)}`,
-    );
+    setVisibleWagonCount(prefersReducedMotion ? accumulatedLetters.length : 0);
+    let cancelled = false;
+    const wait = (delay: number) => new Promise<void>((resolve) => window.setTimeout(resolve, delay));
+    const announceWagons = async () => {
+      for (const capital of accumulatedLetters) {
+        if (cancelled) return;
+        await audioService.playPrompt(capital);
+        if (cancelled) return;
+        await wait(60);
+      }
+    };
+    const buildTrain = async () => {
+      if (prefersReducedMotion) {
+        setCanContinue(true);
+        return;
+      }
 
-    const revealDelay = prefersReducedMotion ? 200 : Math.min(3400, 950 + accumulatedLetters.length * 65);
-    const revealTimeout = window.setTimeout(() => setCanContinue(true), revealDelay);
+      await wait(220);
+      // The train keeps moving while the letters are spoken in sequence, so a
+      // longer recording never makes the wagon animation feel stuck.
+      void announceWagons();
+      for (let index = 0; index < accumulatedLetters.length; index += 1) {
+        if (cancelled) return;
+        setVisibleWagonCount(index + 1);
+        await wait(380);
+      }
+      if (!cancelled) setCanContinue(true);
+    };
+    void buildTrain();
+
     const scrollTimeout = window.setTimeout(() => {
       const viewport = viewportRef.current;
       if (viewport) viewport.scrollTo({ left: viewport.scrollWidth, behavior: prefersReducedMotion ? 'auto' : 'smooth' });
-    }, prefersReducedMotion ? 100 : 850);
+    }, prefersReducedMotion ? 100 : Math.min(8_000, 500 + accumulatedLetters.length * 410));
 
     return () => {
-      window.clearTimeout(revealTimeout);
+      cancelled = true;
+      audioService.stop();
       window.clearTimeout(scrollTimeout);
     };
-  }, [accumulatedLetters, isCompleteAlphabet, prefersReducedMotion]);
+  }, [accumulatedLetters, prefersReducedMotion]);
 
   const playLetterPair = (capital: string) => {
     soundEffects.playClick();
-    void audioService.playPrompt(`${capital} and ${capital.toLowerCase()}`);
+    void audioService.playPrompt(capital);
   };
 
   const finish = () => {
@@ -131,29 +157,29 @@ export default function AlphabetTrainScreen({ letter, onComplete }: AlphabetTrai
         />
       ))}
 
-      <div className="relative z-10 mx-auto flex w-full max-w-7xl flex-1 flex-col px-4 pb-4 pt-3 md:px-8 md:pb-7 md:pt-5">
+      <div className="relative z-10 mx-auto flex w-full max-w-7xl flex-1 flex-col px-3 pb-3 pt-2 md:px-8 md:pb-7 md:pt-5">
         <motion.header
           initial={{ opacity: 0, y: -18 }}
           animate={{ opacity: 1, y: 0 }}
-          className="mx-auto flex w-full max-w-5xl flex-col gap-4 rounded-[2rem] border border-white/15 bg-white/10 px-5 py-4 shadow-2xl shadow-black/20 backdrop-blur-xl md:flex-row md:items-center md:justify-between md:px-7"
+          className="mx-auto flex w-full max-w-5xl flex-col gap-3 rounded-3xl border border-white/15 bg-white/10 px-3 py-3 shadow-2xl shadow-black/20 backdrop-blur-xl md:flex-row md:items-center md:justify-between md:rounded-[2rem] md:px-7 md:py-4"
         >
           <div className="flex items-center justify-center gap-4 text-left">
-            <div className="relative grid h-14 w-14 shrink-0 place-items-center rounded-2xl border border-amber-200/40 bg-gradient-to-br from-amber-300 to-orange-500 shadow-lg shadow-orange-500/30">
-              <Star className="fill-white text-white" size={30} />
+            <div className="relative grid h-11 w-11 shrink-0 place-items-center rounded-xl border border-amber-200/40 bg-gradient-to-br from-amber-300 to-orange-500 shadow-lg shadow-orange-500/30 md:h-14 md:w-14 md:rounded-2xl">
+              <Star className="fill-white text-white" size={24} />
               <span className="absolute -right-2 -top-2 rounded-full bg-emerald-400 px-2 py-0.5 text-[10px] font-black text-emerald-950">EXPRESS</span>
             </div>
             <div>
-              <p className="text-xs font-black uppercase tracking-[0.3em] text-cyan-200">Phonics Adventure Railway</p>
-              <h2 className="text-2xl font-black leading-tight text-white md:text-4xl">
+              <p className="text-[9px] font-black uppercase tracking-[0.22em] text-cyan-200 md:text-xs md:tracking-[0.3em]">Phonics Adventure Railway</p>
+              <h2 className="text-xl font-black leading-tight text-white md:text-4xl">
                 {isCompleteAlphabet ? 'Alphabet Express Complete!' : 'The Alphabet Express'}
               </h2>
-              <p className="mt-1 text-sm font-bold text-sky-100/80">
+              <p className="mt-1 text-xs font-bold text-sky-100/80 md:text-sm">
                 New passengers: {lessonLetters.map((item) => `${item}${item.toLowerCase()}`).join(' · ')}
               </p>
             </div>
           </div>
 
-          <div className="min-w-[230px] rounded-2xl border border-white/15 bg-slate-950/35 p-3 text-left shadow-inner">
+          <div className="w-full min-w-0 rounded-2xl border border-white/15 bg-slate-950/35 p-3 text-left shadow-inner md:min-w-[230px]">
             <div className="mb-2 flex items-center justify-between text-xs font-black uppercase tracking-wider text-sky-100">
               <span>{accumulatedLetters.length} of 26 aboard</span>
               <span className="text-amber-300">{progress}%</span>
@@ -169,30 +195,33 @@ export default function AlphabetTrainScreen({ letter, onComplete }: AlphabetTrai
           </div>
         </motion.header>
 
-        <section className="relative mt-5 flex min-h-[330px] flex-1 flex-col justify-end overflow-hidden rounded-[2.25rem] border border-white/15 bg-gradient-to-b from-sky-300/10 via-transparent to-emerald-950/50 shadow-[0_28px_80px_rgba(0,0,0,.38)] backdrop-blur-[2px]">
+        <section className="relative mt-3 flex h-[21rem] flex-none flex-col justify-end overflow-hidden rounded-3xl border border-white/15 bg-gradient-to-b from-sky-300/10 via-transparent to-emerald-950/50 shadow-[0_28px_80px_rgba(0,0,0,.38)] backdrop-blur-[2px] md:mt-5 md:min-h-[330px] md:flex-1 md:rounded-[2.25rem]">
           <div className="pointer-events-none absolute left-5 top-5 rounded-xl border border-white/20 bg-slate-950/45 px-4 py-2 text-left shadow-xl backdrop-blur-md">
             <p className="text-[10px] font-black uppercase tracking-[0.26em] text-cyan-200">Next stop</p>
             <p className="text-lg font-black text-white">Letter {accumulatedLetters.at(-1)}</p>
           </div>
 
-          <div ref={viewportRef} className="relative z-10 w-full overflow-x-auto px-5 pb-12 pt-24 [scrollbar-color:#38bdf8_rgba(15,23,42,.35)] [scrollbar-width:thin] md:px-9">
+          <div ref={viewportRef} className="relative z-10 w-full overflow-hidden px-2 pb-8 pt-16 md:overflow-x-auto md:px-9 md:pb-12 md:pt-24 [scrollbar-color:#38bdf8_rgba(15,23,42,.35)] [scrollbar-width:thin]">
             <motion.div
-              initial={prefersReducedMotion ? false : { x: '75vw', opacity: 0 }}
-              animate={{ x: 0, opacity: 1 }}
-              transition={{ type: 'spring', stiffness: 58, damping: 18, mass: 1.25 }}
-              className="flex w-max min-w-full items-end"
+              initial={false}
+              animate={{ opacity: 1 }}
+              className="flex w-max min-w-full origin-bottom-left scale-[0.46] items-end md:scale-100"
             >
               <Locomotive reducedMotion={prefersReducedMotion} />
 
-              {accumulatedLetters.map((capital, index) => {
+              {accumulatedLetters.slice(0, visibleWagonCount).map((capital, index) => {
                 const theme = WAGON_THEMES[index % WAGON_THEMES.length];
                 const isNew = newLetters.has(capital);
                 return (
                   <motion.div
                     key={capital}
-                    initial={prefersReducedMotion ? false : { opacity: 0, y: -55, scale: 0.62 }}
-                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                    transition={{ delay: prefersReducedMotion ? 0 : 0.32 + index * 0.052, type: 'spring', stiffness: 250, damping: 18 }}
+                    initial={prefersReducedMotion ? false : { opacity: 0, x: 120, y: -24, scale: 0.72 }}
+                    animate={{ opacity: 1, x: 0, y: 0, scale: 1 }}
+                    transition={{
+                      delay: 0,
+                      duration: prefersReducedMotion ? 0 : 0.36,
+                      ease: 'easeOut',
+                    }}
                     className="relative flex items-end"
                   >
                     <span className="mb-12 h-3 w-6 border-y-2 border-slate-950 bg-amber-300" aria-hidden="true" />

@@ -8,7 +8,7 @@ import { preloadImages } from '../../utils/preloadImages';
 import { assetUrl } from '../../utils/assetUrl';
 import { celebrateCorrectAnswer } from '../../utils/correctAnswerCelebration';
 import FeedbackToast from './FeedbackToast';
-import { formatInitialSoundCharacters, startsWithInitialSoundCharacter } from '../../utils/initialSound';
+import { formatInitialSoundCharacters, wordHasSound } from '../../utils/initialSound';
 
 interface ChooseExerciseScreenProps {
   letter: any;
@@ -37,12 +37,17 @@ export default function ChooseExerciseScreen({
     if (!String(letter.id || '').startsWith('capital-')) {
       const target = letter.letter || letter.id;
       const sourceOptions = chooseData?.options ?? [];
-      const validCorrectOption = sourceOptions.find(
-        (option: any) => option?.isCorrect && startsWithInitialSoundCharacter(option.word, target),
-      );
+      const vocabulary = (letter.vocabulary || []).filter((item: any) => item?.word && item?.image);
+      const correctVocabularyWord = vocabulary.find((item: any) => wordHasSound(item.word, target));
 
-      if (validCorrectOption) {
-        return [{ target, options: sourceOptions }];
+      if (correctVocabularyWord) {
+        const distractors = sourceOptions
+          .filter((option: any) => String(option?.word || '').toLowerCase() !== correctVocabularyWord.word.toLowerCase())
+          .map((option: any) => ({ ...option, isCorrect: false }));
+        return [{
+          target,
+          options: [{ ...correctVocabularyWord, isCorrect: true }, ...distractors].slice(0, 3),
+        }];
       }
 
       const reviewSounds = (letter.activities || [])
@@ -66,10 +71,9 @@ export default function ChooseExerciseScreen({
     const vocabulary = (letter.vocabulary || []).filter((item: any) => item?.word && item?.image);
 
     return lessonLetters.map((target: string, targetIndex: number) => {
-      const correct = vocabulary.find((item: any) => startsWithInitialSoundCharacter(item.word, target))
-        || vocabulary.find((item: any) => String(item.word).toUpperCase().includes(target));
+      const correct = vocabulary.find((item: any) => wordHasSound(item.word, target));
       const distractorPool = vocabulary.filter(
-        (item: any) => !startsWithInitialSoundCharacter(item.word, target) && item.word !== correct?.word,
+        (item: any) => !wordHasSound(item.word, target) && item.word !== correct?.word,
       );
       const rotatedDistractors = distractorPool.length
         ? [...distractorPool.slice(targetIndex % distractorPool.length), ...distractorPool.slice(0, targetIndex % distractorPool.length)]
@@ -98,7 +102,11 @@ export default function ChooseExerciseScreen({
   }, [options, letter?.id, exerciseNumber, questionIndex]);
   const formatQuestionText = (value: string) => (preserveLetterCase ? value : value.toLowerCase());
   const displayLetter = formatInitialSoundCharacters(currentQuestion?.target || letter.letter || letter.id, preserveLetterCase);
-  const prompt = currentQuestion?.letterOnly ? `Choose the letter ${displayLetter}` : `${displayLetter} for:`;
+  const prompt = currentQuestion?.letterOnly
+    ? `Choose the letter ${displayLetter}`
+    : String(letter.id || '').startsWith('capital-')
+      ? `Which picture starts with ${displayLetter}?`
+      : `${displayLetter} is for:`;
   const announcementKey = `${letter.id}-${exerciseNumber}-${questionIndex}-${prompt}`;
   const hasData = options.length > 0;
 
@@ -238,7 +246,7 @@ export default function ChooseExerciseScreen({
         )}
       </div>
 
-      <div className="grid w-full max-w-4xl grid-cols-3 gap-2 sm:gap-4 md:gap-6">
+      <div className="grid w-full max-w-sm grid-cols-1 gap-3 md:max-w-4xl md:grid-cols-3 md:gap-6">
         {shuffledOptions.map((option: any, index: number) => (
           <motion.button
             key={index}
@@ -247,7 +255,7 @@ export default function ChooseExerciseScreen({
             onClick={() => handleSelect(index, option)}
             disabled={feedback?.type === 'success'}
             aria-label={`Choose ${option.word}`}
-            className={`relative rounded-2xl border-4 p-2 shadow-xl transition-all sm:rounded-3xl sm:p-4 ${
+            className={`relative w-full rounded-2xl border-4 p-2 shadow-xl transition-all sm:rounded-3xl sm:p-4 ${
               selected === index
                 ? feedback === null
                   ? 'bg-blue-100 border-blue-500'
@@ -258,7 +266,7 @@ export default function ChooseExerciseScreen({
             }`}
           >
             {currentQuestion?.letterOnly ? (
-              <span className="grid h-[clamp(6rem,24vw,11rem)] place-items-center text-5xl font-black text-indigo-700 sm:text-7xl md:text-8xl">
+              <span className="grid h-[clamp(7rem,19dvh,11rem)] place-items-center text-5xl font-black text-indigo-700 sm:text-7xl md:h-[clamp(6rem,24vw,11rem)] md:text-8xl">
                 {option.word}
               </span>
             ) : (
@@ -269,7 +277,7 @@ export default function ChooseExerciseScreen({
                 loading="eager"
                 fetchPriority="high"
                 decoding="async"
-                className="h-[clamp(6rem,24vw,11rem)] w-full rounded-2xl object-contain p-1 sm:p-2"
+                className="h-[clamp(7rem,19dvh,11rem)] w-full rounded-2xl object-contain p-1 sm:p-2 md:h-[clamp(6rem,24vw,11rem)]"
               />
             )}
 

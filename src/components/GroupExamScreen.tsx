@@ -8,7 +8,7 @@ import { preloadImages } from '@/utils/preloadImages';
 import { assetUrl } from '@/utils/assetUrl';
 import { celebrateCorrectAnswer } from '@/utils/correctAnswerCelebration';
 import FeedbackToast from './lesson/FeedbackToast';
-import { formatInitialSoundCharacters, startsWithInitialSoundCharacter } from '@/utils/initialSound';
+import { formatInitialSoundCharacters, startsWithInitialSoundCharacter, wordHasSound } from '@/utils/initialSound';
 
 interface GroupExamScreenProps {
   groupId: number;
@@ -97,11 +97,8 @@ function makeListenImageQuestion(letter: any, index: number): ExamQuestion | nul
 
 function makePictureLetterQuestion(group: any, letter: any, index: number): ExamQuestion | null {
   const lessonSound = letter.letter || letter.id;
-  const correctChooseOption = (letter.choose?.options || []).find(
-    (option: any) => option.isCorrect && startsWithInitialSoundCharacter(option.word, lessonSound),
-  );
-  const item = correctChooseOption || (letter.vocabulary || []).find(
-    (option: any) => startsWithInitialSoundCharacter(option.word, lessonSound),
+  const item = (letter.vocabulary || []).find(
+    (option: any) => wordHasSound(option.word, lessonSound),
   );
   if (!item?.image) return null;
 
@@ -117,11 +114,21 @@ function makePictureLetterQuestion(group: any, letter: any, index: number): Exam
 }
 
 function makeHearCheckQuestion(letter: any, index: number): ExamQuestion | null {
-  const activity = (letter.activities || []).find((item: any) => item.type === 'HEAR_CHECK' && item.items?.length);
-  const item = activity?.items?.[index % activity.items.length];
+  const target = letter.letter || letter.id;
+  const isCapitalLesson = String(letter.id || '').startsWith('capital-');
+  const matchesLessonSound = (word: string) => isCapitalLesson
+    ? startsWithInitialSoundCharacter(word, target)
+    : wordHasSound(word, target);
+  const vocabulary = letter.vocabulary || [];
+  const falseWord = [
+    ...(letter.choose?.options || []).map((option: any) => option?.word),
+    'cat', 'dog', 'sun', 'fish', 'bed', 'pen',
+  ].find((word: string) => word && !matchesLessonSound(word));
+  const candidates = [vocabulary[0]?.word, falseWord, vocabulary[1]?.word].filter(Boolean);
+  const item = candidates[index % candidates.length];
   if (!item) return null;
 
-  const correctValue = String(item.answer || (item.isCorrect ? 'yes' : 'no')).toLowerCase();
+  const correctValue = matchesLessonSound(item) ? 'yes' : 'no';
   const prepared = shuffleQuestionOptions([
     { value: 'yes', label: 'Yes', tone: 'yes' },
     { value: 'no', label: 'No', tone: 'no' },
@@ -129,8 +136,10 @@ function makeHearCheckQuestion(letter: any, index: number): ExamQuestion | null 
   return {
     id: `${letter.id}-hear-${index}`,
     type: 'hear-check',
-    prompt: `Does the word start with ${formatInitialSoundCharacters(letter.letter || letter.id)}?`,
-    audioText: item.word,
+    prompt: isCapitalLesson
+      ? `Does the word start with ${formatInitialSoundCharacters(target)}?`
+      : `Does the word have the ${formatInitialSoundCharacters(target)} sound?`,
+    audioText: item,
     ...prepared,
   };
 }

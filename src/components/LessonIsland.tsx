@@ -235,7 +235,7 @@ export default function LessonIsland({
               <circle cx="24" cy="50" r="5" fill="#68717B" />
             </g>
           ) : (
-            <text x="205" y="104" textAnchor="middle" dominantBaseline="middle" fill="white" fontSize={letter.length > 1 ? 62 : 82} fontWeight="900" fontFamily="'Comic Sans MS', 'Comic Sans', cursive">
+              <text x="205" y="104" textAnchor="middle" dominantBaseline="middle" fill="white" fontSize={letter.length > 1 ? 62 : 82} fontWeight="900" fontFamily="'Phonics Comic Sans', 'Comic Sans MS', sans-serif">
               {preserveLetterCase ? letter : letter.toLowerCase()}
             </text>
           )}

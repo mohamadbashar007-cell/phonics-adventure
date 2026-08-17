@@ -2,7 +2,8 @@ import curriculum from '../data/curriculum.json';
 import recordedAudioConfig from '../data/recordedAudioConfig.json';
 import recordedAudioPrompts from '../data/recordedAudioPrompts.json';
 
-const AUDIO_CACHE_VERSION = '20260815-complete-lahajati';
+// Make phones retry recordings that may have been cached as a failed request.
+const AUDIO_CACHE_VERSION = '20260818-audio-fix';
 
 function withAudioVersion(value: string) {
   if (!value) return '';
@@ -19,6 +20,14 @@ function sanitizeAudioKey(value: string) {
 
 const recordedVocabularyAudio = new Map<string, string>();
 
+function getStoryBlendSentences(text: unknown): string[] {
+  return String(text || '')
+    .split(/(?<=[.!?])\s+/)
+    .map((sentence) => sentence.trim())
+    .filter((sentence) => (sentence.match(/[A-Za-z]+(?:'[A-Za-z]+)?/g) || []).length >= 3)
+    .slice(0, 3);
+}
+
 function registerRecordedText(text: string, audio?: string) {
   const key = sanitizeAudioKey(text);
   if (!key || recordedVocabularyAudio.has(key)) return;
@@ -29,13 +38,14 @@ function registerRecordedText(text: string, audio?: string) {
   (group.letters || []).forEach((letter: any) => {
     if (recordedAudioConfig.extendedPromptsReady) {
       registerRecordedText(letter.letter);
-      registerRecordedText(`"${letter.letter}" for:`);
+      if (group.id !== 7) registerRecordedText(`"${letter.letter}" is for:`);
       registerRecordedText(`Trace the letter ${letter.letter}`);
     }
 
     (letter.vocabulary || []).forEach((item: any) => {
       registerRecordedText(item.word, item.audio);
     });
+    if (group.id === 7) getStoryBlendSentences(letter.story?.text).forEach((sentence) => registerRecordedText(sentence));
   });
 });
 
@@ -89,6 +99,12 @@ export function getLessonAudioSources(letter: any) {
     const audio = item.audio || getVocabularyAudioPath(item.word);
     if (audio) sources.add(audio);
   });
+  if (String(letter?.id || '').startsWith('capital-')) {
+    getStoryBlendSentences(letter?.story?.text).forEach((sentence) => {
+      const recordedAudio = getRecordedVocabularyAudioPath(sentence);
+      if (recordedAudio) sources.add(recordedAudio);
+    });
+  }
 
   const visit = (value: any) => {
     if (!value) return;

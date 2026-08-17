@@ -3,7 +3,12 @@ import { getLessonAudioSources, getRecordedVocabularyAudioPath } from '../utils/
 
 const MAX_CACHED_AUDIO_BUFFERS = 18;
 const MAX_CONCURRENT_AUDIO_PRELOADS = 3;
-const AUDIO_FETCH_TIMEOUT_MS = 8_000;
+// A missing/cached-failed recording must fall back to speech promptly instead
+// of leaving a lesson question waiting several seconds for network audio.
+const AUDIO_FETCH_TIMEOUT_MS = 3_000;
+// On slower phones, do not leave a child waiting on an uncached recording.
+// The download continues for the next attempt while speech starts promptly.
+const AUDIO_PLAYBACK_BUFFER_WAIT_MS = 1_200;
 const AUDIO_CONTEXT_RESUME_TIMEOUT_MS = 1_500;
 
 const FEMALE_VOICE_NAMES =
@@ -352,7 +357,12 @@ class AudioService {
     // Start resume while the click still has browser user activation. Decoding
     // continues in parallel if the preload has not completed yet.
     const resumePromise = context ? this.resumeAudioContext(context) : Promise.resolve(false);
-    const buffer = await this.requestAudioBuffer(resolvedSrc, true);
+    const buffer = await Promise.race<AudioBuffer | null>([
+      this.requestAudioBuffer(resolvedSrc, true),
+      new Promise<null>((resolve) => {
+        globalThis.setTimeout(() => resolve(null), AUDIO_PLAYBACK_BUFFER_WAIT_MS);
+      }),
+    ]);
     if (!buffer || version !== this.playbackVersion || !context) {
       if (!context && version === this.playbackVersion) {
         return this.playWithHtmlAudio(resolvedSrc, version);

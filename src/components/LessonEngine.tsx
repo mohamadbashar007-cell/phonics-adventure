@@ -70,10 +70,16 @@ export default function LessonEngine({ groupId, letter, onComplete, onExit }: Le
   const [viewportScale, setViewportScale] = useState(() => getLessonViewportScale());
   const progressStore = useProgressStore();
   const isCapitalGroup = groupId === 7;
+  const omitsEarlyGroupOneBlend = groupId === 1 && ['s', 'a'].includes(String(letter.id || '').toLowerCase());
   const activitySections = useMemo(() => getLessonActivitySections(letter), [letter]);
   const visibleActivitySections = useMemo(
     () => activitySections
-      .filter((section) => (isCapitalGroup ? section.key !== 'tap' : section.key !== 'match'))
+      .filter((section) => (
+        (isCapitalGroup
+          ? section.key !== 'tap'
+          : section.key !== 'match' && section.key !== 'segment')
+        && !(omitsEarlyGroupOneBlend && section.key === 'blend')
+      ))
       .map((section) => {
         if (!isCapitalGroup) return section;
         if (section.key === 'blend') return { ...section, label: 'Sentence' };
@@ -86,9 +92,11 @@ export default function LessonEngine({ groupId, letter, onComplete, onExit }: Le
         }
         return section;
       }),
-    [activitySections, isCapitalGroup],
+    [activitySections, isCapitalGroup, omitsEarlyGroupOneBlend],
   );
-  const hasChooseActivity = true;
+  // Capital-letter lessons use their dedicated activities and train instead of
+  // the picture-starts-with Quiz.
+  const hasChooseActivity = !isCapitalGroup;
   const traceLetters = useMemo(() => getTraceLettersForLesson(groupId, letter), [groupId, letter]);
   const lessonFlow: Array<{ key: LessonScreen; label: string }> = [
     { key: 'story', label: 'Story' },

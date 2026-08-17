@@ -21,6 +21,7 @@ const GENERATION_WORKERS = Math.max(1, Number.parseInt(process.env.LAHAJATI_WORK
 const ACCOUNT_WORKERS = Math.max(1, Number.parseInt(process.env.LAHAJATI_ACCOUNT_WORKERS || '4', 10) || 1);
 const ACCOUNT_LOGIN_WORKERS = Math.max(1, Number.parseInt(process.env.LAHAJATI_LOGIN_WORKERS || '3', 10) || 1);
 const ACCOUNT_DAILY_JOB_LIMIT = 25;
+const CHECK_ONLY = process.argv.includes('--check');
 
 const sleep = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
 
@@ -30,6 +31,14 @@ function sanitizeAudioKey(value) {
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '');
+}
+
+function getStoryBlendSentences(text) {
+  return String(text || '')
+    .split(/(?<=[.!?])\s+/)
+    .map((sentence) => sentence.trim())
+    .filter((sentence) => (sentence.match(/[A-Za-z]+(?:'[A-Za-z]+)?/g) || []).length >= 3)
+    .slice(0, 3);
 }
 
 function buildJobs() {
@@ -52,12 +61,13 @@ function buildJobs() {
   for (const group of curriculum.groups || []) {
     for (const letter of group.letters || []) {
       registerVocabularyAudio(letter.letter);
-      registerVocabularyAudio(`"${letter.letter}" for:`);
+      if (group.id !== 7) registerVocabularyAudio(`"${letter.letter}" is for:`);
       registerVocabularyAudio(`Trace the letter ${letter.letter}`);
 
       for (const item of letter.vocabulary || []) {
         registerVocabularyAudio(item.word);
       }
+      if (group.id === 7) getStoryBlendSentences(letter.story?.text).forEach(registerVocabularyAudio);
 
       if (!letter.story?.text) continue;
       const storyUrl = (letter.story.audio || `/audio/stories/${sanitizeAudioKey(letter.id)}-story.mp3`).split('?')[0];
@@ -363,6 +373,15 @@ function installGeneratedAudio(jobs) {
 async function main() {
   const jobs = buildJobs();
   const totalCharacters = jobs.reduce((sum, job) => sum + job.text.length, 0);
+  if (CHECK_ONLY) {
+    const missing = jobs.filter((job) => {
+      const destination = path.join(ROOT, job.relativePath);
+      return !fs.existsSync(destination) || !isValidAudio(fs.readFileSync(destination));
+    });
+    console.log(`Audio audit: ${jobs.length - missing.length}/${jobs.length} ready; ${missing.length} missing or invalid.`);
+    missing.forEach((job) => console.log(`${job.relativePath}\t${job.text}`));
+    return;
+  }
   console.log(`Preparing ${jobs.length} files (${totalCharacters} text characters).`);
   fs.mkdirSync(STAGING_DIR, { recursive: true });
 

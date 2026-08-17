@@ -57,6 +57,7 @@ export default function StorySentenceBlendScreen({ letter, onComplete }: StorySe
     setAvailableTiles(shuffledTiles(targetWords));
     setPlacedTiles([]);
     setFeedback(null);
+    audioService.preloadPromptAudio(sentence);
     const timeoutId = window.setTimeout(() => void audioService.playPrompt(sentence), 300);
     return () => window.clearTimeout(timeoutId);
   }, [sentence, targetWords]);

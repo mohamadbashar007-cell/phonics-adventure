@@ -20,6 +20,7 @@
     "responsive:check": "node ./scripts/responsive-check.mjs",
     "preview:check": "node ./scripts/check-preview.mjs",
     "pronunciation:check": "tsx ./scripts/check-pronunciation-vocab.ts",
+    "audio:check": "node ./scripts/generate-lahajati-audio.mjs --check",
     "images:letters": "node ./scripts/generate-letter-images.mjs",
     "db:init": "tsx ./scripts/init-postgres.mjs",
     "db:check": "node ./scripts/check-postgres.mjs",
