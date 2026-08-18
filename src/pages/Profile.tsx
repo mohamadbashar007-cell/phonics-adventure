@@ -13,9 +13,16 @@ export default function ProfilePage() {
   const completedGroups = useProgressStore((state) => state.getCompletedGroups());
   const averageScore = useProgressStore((state) => state.getAverageScore());
   const examScores = useProgressStore((state) => state.examScores);
+  const signOut = useProgressStore((state) => state.signOut);
 
   const handleBack = () => {
     soundEffects.playClick();
+    setLocation('/');
+  };
+
+  const handleSignOut = () => {
+    soundEffects.playClick();
+    signOut();
     setLocation('/');
   };
 
@@ -66,9 +73,14 @@ export default function ProfilePage() {
               {profile?.age ? `Age: ${profile.age}` : 'Getting started...'} 
             </p>
           </div>
-          <p className="mt-6 text-center font-bold text-indigo-600">
-            Preview mode — no sign-in required and all content is unlocked.
-          </p>
+          <div className="mt-6 flex justify-center">
+            <button
+              onClick={handleSignOut}
+              className="px-6 py-3 rounded-full bg-red-500 text-white font-black shadow-lg hover:bg-red-600 transition-colors"
+            >
+              Sign Out
+            </button>
+          </div>
         </motion.div>
 
         {/* Stats Grid */}

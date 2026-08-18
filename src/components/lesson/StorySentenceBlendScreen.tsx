@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { RotateCcw, Volume2 } from 'lucide-react';
 import { audioService } from '../../services/audioService';
 import { soundEffects } from '../../services/soundEffects';
 import { celebrateCorrectAnswer } from '../../utils/correctAnswerCelebration';
+import { getStoryBlendSentenceAudioPath, getStoryBlendSentences } from '../../utils/audioPaths';
 import FeedbackToast from './FeedbackToast';
 
 interface StorySentenceBlendScreenProps {
@@ -35,19 +36,24 @@ function shuffledTiles(words: string[]) {
 export default function StorySentenceBlendScreen({ letter, onComplete }: StorySentenceBlendScreenProps) {
   const storySentences = useMemo(() => {
     const text = String(letter?.story?.text || '').trim();
-    const sentences = text
-      .split(/(?<=[.!?])\s+/)
-      .map((sentence) => sentence.trim())
-      .filter((sentence) => tokenize(sentence).length >= 3);
+    const sentences = getStoryBlendSentences(text);
     return (sentences.length ? sentences : [text]).filter(Boolean).slice(0, 3);
   }, [letter?.story?.text]);
   const [sentenceIndex, setSentenceIndex] = useState(0);
   const sentence = storySentences[Math.min(sentenceIndex, storySentences.length - 1)] || '';
+  const sentenceAudio = useMemo(
+    () => getStoryBlendSentenceAudioPath(letter, Math.min(sentenceIndex, storySentences.length - 1)),
+    [letter, sentenceIndex, storySentences.length],
+  );
   const targetWords = useMemo(() => tokenize(sentence), [sentence]);
   const [availableTiles, setAvailableTiles] = useState<WordTile[]>([]);
   const [placedTiles, setPlacedTiles] = useState<WordTile[]>([]);
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const isLastSentence = sentenceIndex >= storySentences.length - 1;
+  const playSentence = useCallback(async () => {
+    if (sentenceAudio && (await audioService.playAudioFile(sentenceAudio))) return;
+    await audioService.playPrompt(sentence);
+  }, [sentence, sentenceAudio]);
 
   useEffect(() => {
     setSentenceIndex(0);
@@ -57,10 +63,10 @@ export default function StorySentenceBlendScreen({ letter, onComplete }: StorySe
     setAvailableTiles(shuffledTiles(targetWords));
     setPlacedTiles([]);
     setFeedback(null);
-    audioService.preloadPromptAudio(sentence);
-    const timeoutId = window.setTimeout(() => void audioService.playPrompt(sentence), 300);
+    audioService.preloadAudioFile(sentenceAudio, { priority: true });
+    const timeoutId = window.setTimeout(() => void playSentence(), 300);
     return () => window.clearTimeout(timeoutId);
-  }, [sentence, targetWords]);
+  }, [playSentence, sentenceAudio, targetWords]);
 
   const placeTile = (tile: WordTile) => {
     if (feedback?.type === 'success') return;
@@ -91,7 +97,7 @@ export default function StorySentenceBlendScreen({ letter, onComplete }: StorySe
       setFeedback({ type: 'success', text: 'Great story sentence!' });
       soundEffects.playCelebration();
       celebrateCorrectAnswer();
-      void audioService.playPrompt(sentence);
+      void playSentence();
       return;
     }
 
@@ -122,7 +128,7 @@ export default function StorySentenceBlendScreen({ letter, onComplete }: StorySe
         type="button"
         whileHover={{ scale: 1.08 }}
         whileTap={{ scale: 0.92 }}
-        onClick={() => void audioService.playPrompt(sentence)}
+        onClick={() => void playSentence()}
         className="relative z-10 mt-5 grid h-20 w-20 place-items-center rounded-full bg-blue-600 text-white shadow-xl"
         aria-label="Play story sentence"
       >

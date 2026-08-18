@@ -3,7 +3,7 @@ import recordedAudioConfig from '../data/recordedAudioConfig.json';
 import recordedAudioPrompts from '../data/recordedAudioPrompts.json';
 
 // Make phones retry recordings that may have been cached as a failed request.
-const AUDIO_CACHE_VERSION = '20260818-audio-fix';
+const AUDIO_CACHE_VERSION = '20260818-story-blend-clips';
 
 function withAudioVersion(value: string) {
   if (!value) return '';
@@ -20,7 +20,7 @@ function sanitizeAudioKey(value: string) {
 
 const recordedVocabularyAudio = new Map<string, string>();
 
-function getStoryBlendSentences(text: unknown): string[] {
+export function getStoryBlendSentences(text: unknown): string[] {
   return String(text || '')
     .split(/(?<=[.!?])\s+/)
     .map((sentence) => sentence.trim())
@@ -45,7 +45,6 @@ function registerRecordedText(text: string, audio?: string) {
     (letter.vocabulary || []).forEach((item: any) => {
       registerRecordedText(item.word, item.audio);
     });
-    if (group.id === 7) getStoryBlendSentences(letter.story?.text).forEach((sentence) => registerRecordedText(sentence));
   });
 });
 
@@ -100,9 +99,9 @@ export function getLessonAudioSources(letter: any) {
     if (audio) sources.add(audio);
   });
   if (String(letter?.id || '').startsWith('capital-')) {
-    getStoryBlendSentences(letter?.story?.text).forEach((sentence) => {
-      const recordedAudio = getRecordedVocabularyAudioPath(sentence);
-      if (recordedAudio) sources.add(recordedAudio);
+    getStoryBlendSentences(letter?.story?.text).forEach((_sentence, index) => {
+      const storyBlendAudio = getStoryBlendSentenceAudioPath(letter, index);
+      if (storyBlendAudio) sources.add(storyBlendAudio);
     });
   }
 
@@ -135,4 +134,10 @@ export function getStoryAudioPath(letter: { id?: string; story?: { audio?: strin
 
   const key = sanitizeAudioKey(letter.id || '');
   return key ? withAudioVersion(`/audio/stories/${key}-story.mp3`) : '';
+}
+
+export function getStoryBlendSentenceAudioPath(letter: { id?: string }, sentenceIndex: number) {
+  const key = sanitizeAudioKey(letter?.id || '');
+  if (!key || !Number.isFinite(sentenceIndex) || sentenceIndex < 0) return '';
+  return withAudioVersion(`/audio/stories/blend/${key}-sentence-${sentenceIndex + 1}.mp3`);
 }

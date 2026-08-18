@@ -1,7 +1,7 @@
 import { assetUrl } from './assetUrl';
 
 const VIDEO_BASE_PATH = '/videos';
-const VIDEO_VERSION = 'v20260724-2';
+const VIDEO_VERSION = 'v20260818-drive-videos';
 const MAX_PRELOADED_VIDEOS = 2;
 const preloadedVideos = new Map<string, { element: HTMLVideoElement; mode: 'metadata' | 'auto' }>();
 
