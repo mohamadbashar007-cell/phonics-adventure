@@ -7,8 +7,9 @@ import { handleImageError } from '@/utils/imagePaths';
 import { preloadImages } from '@/utils/preloadImages';
 import { assetUrl } from '@/utils/assetUrl';
 import { celebrateCorrectAnswer } from '@/utils/correctAnswerCelebration';
+import { formatHearCheckSound, playHearCheckAudio, preloadHearCheckAudio } from '@/utils/hearCheckAudio';
 import FeedbackToast from './lesson/FeedbackToast';
-import { formatInitialSoundCharacters, startsWithInitialSoundCharacter, wordHasSound } from '@/utils/initialSound';
+import { startsWithInitialSoundCharacter, wordHasSound } from '@/utils/initialSound';
 
 interface GroupExamScreenProps {
   groupId: number;
@@ -31,6 +32,7 @@ type ExamQuestion = {
   type: ExamQuestionType;
   prompt: string;
   audioText?: string;
+  hearCheckSound?: string;
   image?: string;
   options: ExamOption[];
   correctOptionIndex: number;
@@ -136,10 +138,9 @@ function makeHearCheckQuestion(letter: any, index: number): ExamQuestion | null 
   return {
     id: `${letter.id}-hear-${index}`,
     type: 'hear-check',
-    prompt: isCapitalLesson
-      ? `Does the word start with ${formatInitialSoundCharacters(target)}?`
-      : `Does the word have the ${formatInitialSoundCharacters(target)} sound?`,
+    prompt: `Can you hear ${formatHearCheckSound(target)} in ...?`,
     audioText: item,
+    hearCheckSound: target,
     ...prepared,
   };
 }
@@ -172,11 +173,23 @@ function makeBlendQuestion(group: any, letter: any, index: number): ExamQuestion
   const target = letterBlendItems[index % Math.max(1, letterBlendItems.length)];
   if (!target?.result) return null;
 
+  const normalizedTarget = target.result.toLowerCase();
+  const pairedDistractor = normalizedTarget === 'sat'
+    ? 'pat'
+    : normalizedTarget === 'pan'
+      ? 'nip'
+      : normalizedTarget === 'nip'
+        ? 'pan'
+        : null;
   const distractors = getBlendItems(group)
-    .filter((item: any) => item.result?.toLowerCase() !== target.result.toLowerCase())
-    .slice(index, index + 4)
+    .filter((item: any) => {
+      const result = String(item?.result || '').toLowerCase();
+      return pairedDistractor ? result === pairedDistractor : result && result !== normalizedTarget;
+    })
+    .slice(pairedDistractor ? 0 : index, pairedDistractor ? 1 : index + 4)
     .map((item: any) => ({ value: item.result, label: item.result }));
-  const options = uniqueByValue([{ value: target.result, label: target.result }, ...distractors]).slice(0, 3);
+  const options = uniqueByValue([{ value: target.result, label: target.result }, ...distractors])
+    .slice(0, pairedDistractor ? 2 : 3);
   if (options.length < 2) return null;
 
   const prepared = shuffleQuestionOptions(options, target.result);
@@ -197,6 +210,14 @@ const QUESTION_BUILDERS: QuestionBuilder[] = [
   (_group, letter, index) => makeHearCheckQuestion(letter, index),
   (group, letter, index) => makeSoundLetterQuestion(group, letter, index),
   (group, letter, index) => makeBlendQuestion(group, letter, index),
+];
+
+const QUESTION_TYPE_ORDER: ExamQuestionType[] = [
+  'listen-image',
+  'picture-letter',
+  'hear-check',
+  'sound-letter',
+  'blend',
 ];
 
 export function buildExamQuestions(group: any): ExamQuestion[] {
@@ -230,7 +251,9 @@ export function buildExamQuestions(group: any): ExamQuestion[] {
     attempt += 1;
   }
 
-  return questions;
+  return [...questions].sort(
+    (left, right) => QUESTION_TYPE_ORDER.indexOf(left.type) - QUESTION_TYPE_ORDER.indexOf(right.type),
+  );
 }
 
 export default function GroupExamScreen({ groupId, group, onComplete, onExit }: GroupExamScreenProps) {
@@ -239,11 +262,31 @@ export default function GroupExamScreen({ groupId, group, onComplete, onExit }: 
   const [answered, setAnswered] = useState(false);
   const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null);
   const autoplayRef = useRef<number | null>(null);
+  const audioPlaybackRequestRef = useRef(0);
   const examQuestions = useMemo(() => buildExamQuestions(group), [group]);
   const currentQuestion = examQuestions[currentQuestionIndex];
 
+  const playQuestionAudio = (question: ExamQuestion) => {
+    if (!question.audioText) return;
+
+    const requestId = audioPlaybackRequestRef.current + 1;
+    audioPlaybackRequestRef.current = requestId;
+    const isCurrentRequest = () => audioPlaybackRequestRef.current === requestId;
+    const playback = question.type === 'hear-check' && question.hearCheckSound
+      ? playHearCheckAudio(question.hearCheckSound, question.audioText, isCurrentRequest)
+      : audioService.playPrompt(question.audioText);
+
+    void playback.catch((error) => {
+      if (!isCurrentRequest()) return;
+      console.error('Exam audio playback failed:', error);
+      audioService.stop();
+    });
+  };
+
   useEffect(() => {
     if (!currentQuestion) return;
+    audioPlaybackRequestRef.current += 1;
+    audioService.stop();
     audioService.warmup();
     const nextQuestion = examQuestions[currentQuestionIndex + 1];
     preloadImages(
@@ -255,17 +298,27 @@ export default function GroupExamScreen({ groupId, group, onComplete, onExit }: 
       ].filter((image): image is string => Boolean(image)),
       { priority: true },
     );
-    if (currentQuestion.audioText) audioService.preloadPromptAudio(currentQuestion.audioText);
-    if (nextQuestion?.audioText) audioService.preloadPromptAudio(nextQuestion.audioText);
+    if (currentQuestion.type === 'hear-check' && currentQuestion.hearCheckSound && currentQuestion.audioText) {
+      preloadHearCheckAudio(currentQuestion.hearCheckSound, currentQuestion.audioText);
+    } else if (currentQuestion.audioText) {
+      audioService.preloadPromptAudio(currentQuestion.audioText);
+    }
+    if (nextQuestion?.type === 'hear-check' && nextQuestion.hearCheckSound && nextQuestion.audioText) {
+      preloadHearCheckAudio(nextQuestion.hearCheckSound, nextQuestion.audioText);
+    } else if (nextQuestion?.audioText) {
+      audioService.preloadPromptAudio(nextQuestion.audioText);
+    }
 
     if (autoplayRef.current) window.clearTimeout(autoplayRef.current);
     if (currentQuestion.audioText) {
       autoplayRef.current = window.setTimeout(() => {
-        void audioService.playPrompt(currentQuestion.audioText!);
+        playQuestionAudio(currentQuestion);
       }, 350);
     }
     return () => {
       if (autoplayRef.current) window.clearTimeout(autoplayRef.current);
+      audioPlaybackRequestRef.current += 1;
+      audioService.stop();
     };
   }, [currentQuestion, currentQuestionIndex, examQuestions]);
 
@@ -311,7 +364,7 @@ export default function GroupExamScreen({ groupId, group, onComplete, onExit }: 
   };
 
   const playAudio = () => {
-    if (currentQuestion.audioText) void audioService.playPrompt(currentQuestion.audioText);
+    playQuestionAudio(currentQuestion);
   };
 
   return (

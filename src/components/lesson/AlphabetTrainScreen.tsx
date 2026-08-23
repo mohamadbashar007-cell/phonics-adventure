@@ -3,6 +3,7 @@ import { motion, useReducedMotion } from 'framer-motion';
 import { ArrowRight, CheckCircle2, Sparkles, Star, Volume2 } from 'lucide-react';
 import { audioService } from '../../services/audioService';
 import { soundEffects } from '../../services/soundEffects';
+import { getAlphabetTrainLetterAudioPath } from '../../utils/audioPaths';
 
 interface AlphabetTrainScreenProps {
   letter: any;
@@ -94,13 +95,14 @@ export default function AlphabetTrainScreen({ letter, onComplete }: AlphabetTrai
     const announceWagons = async () => {
       for (const capital of accumulatedLetters) {
         if (cancelled) return;
-        await audioService.playPrompt(capital);
+        await audioService.playAudioFile(getAlphabetTrainLetterAudioPath(capital));
         if (cancelled) return;
         await wait(60);
       }
     };
     const buildTrain = async () => {
       if (prefersReducedMotion) {
+        void announceWagons();
         setCanContinue(true);
         return;
       }
@@ -132,7 +134,7 @@ export default function AlphabetTrainScreen({ letter, onComplete }: AlphabetTrai
 
   const playLetterPair = (capital: string) => {
     soundEffects.playClick();
-    void audioService.playPrompt(capital);
+    void audioService.playAudioFile(getAlphabetTrainLetterAudioPath(capital));
   };
 
   const finish = () => {

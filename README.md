@@ -1,25 +1,3 @@
-# Phonics Adventure — Unlocked Preview
-
-> Preview-only build. It opens directly without sign-in, keeps all groups,
-> lessons, and exams unlocked, and stores progress locally in the browser.
-> This repository does not replace or modify the production application.
-
-## Run the preview
-
-```bash
-pnpm install
-pnpm build
-pnpm preview
-```
-
-The preview UI does not require a database or an account. Progress stays in
-the browser under the separate `phonics-preview-progress` storage key.
-
-The unlocked preview is published to GitHub Pages from the
-`preview/no-auth-unlocked` branch:
-
-https://mohamadbashar007-cell.github.io/phonics-adventure/
-
 ## Database
 
 The app uses PostgreSQL through `DATABASE_URL`. For production, the intended setup is one VPS/server running both the app and PostgreSQL together through Docker Compose.

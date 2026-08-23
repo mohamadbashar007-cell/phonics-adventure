@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
-import { RotateCcw } from 'lucide-react';
+import { Loader2, RotateCcw, Volume2 } from 'lucide-react';
 import { audioService } from '../../services/audioService';
 import { soundEffects } from '../../services/soundEffects';
 import { getLetterTrace, type LetterTrace } from '../../data/letterTraces';
@@ -74,10 +74,16 @@ export default function TracingScreen({ letter, traceLetters: traceLettersProp, 
   const [traceData, setTraceData] = useState<LetterTrace | null>(null);
   const [isTraceLoading, setIsTraceLoading] = useState(false);
   const [traceError, setTraceError] = useState<string | null>(null);
+  const [isSoundLoading, setIsSoundLoading] = useState(false);
   const activeTraceLetter = traceLetters[Math.min(traceIndex, traceLetters.length - 1)] || 'a';
   const activeTraceLabel = activeTraceLetter.length === 2 && /[A-Z][a-z]/.test(activeTraceLetter)
     ? `${activeTraceLetter[0]} ${activeTraceLetter[1]}`
     : activeTraceLetter;
+  const activeTraceSound = String(letter.id || '').toLowerCase() === 'ck'
+    ? 'ck'
+    : /^[A-Z][a-z]$/.test(activeTraceLetter)
+      ? activeTraceLetter[0].toLowerCase()
+      : activeTraceLetter.toLowerCase();
   const traceInstruction = activeTraceLetter.length > 1
     ? `Trace '${activeTraceLabel}' together`
     : `Trace '${activeTraceLabel}'`;
@@ -94,9 +100,22 @@ export default function TracingScreen({ letter, traceLetters: traceLettersProp, 
     setTraceIndex(0);
   }, [letter.id]);
 
+  const playTraceSound = async () => {
+    if (isSoundLoading) return;
+    setIsSoundLoading(true);
+    try {
+      await audioService.playPrompt(activeTraceSound);
+    } finally {
+      setIsSoundLoading(false);
+    }
+  };
+
   useEffect(() => {
-    audioService.playPrompt(`Trace the letters ${activeTraceLabel}`);
-  }, [activeTraceLabel]);
+    void playTraceSound();
+    // The sound changes only when the active trace letter changes. Including
+    // the loading state here would replay it after every completed playback.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTraceSound]);
 
   useEffect(() => {
     let cancelled = false;
@@ -287,7 +306,20 @@ export default function TracingScreen({ letter, traceLetters: traceLettersProp, 
   return (
     <div className="flex flex-col items-center justify-center min-h-full p-4 md:p-8 text-center relative">
       <h2 className="text-2xl md:text-4xl font-black uppercase tracking-wide text-gray-800 mb-1">TRACE</h2>
-      <p className="text-lg md:text-xl text-gray-700 mb-1 font-black">{traceInstruction}</p>
+      <div className="mb-1 flex items-center justify-center gap-3">
+        <p className="text-lg font-black text-gray-700 md:text-xl">{traceInstruction}</p>
+        <button
+          type="button"
+          onClick={() => void playTraceSound()}
+          disabled={isSoundLoading}
+          aria-label={`Play ${activeTraceSound} sound`}
+          className={`rounded-full p-2 transition-colors ${
+            isSoundLoading ? 'bg-gray-100 text-gray-400' : 'bg-blue-100 text-blue-600 hover:bg-blue-200'
+          }`}
+        >
+          {isSoundLoading ? <Loader2 className="animate-spin" size={22} /> : <Volume2 size={22} />}
+        </button>
+      </div>
       <p className="text-base md:text-lg text-gray-600 mb-2 font-bold">Trace inside the blue letter!</p>
       <p className="text-sm text-gray-500 mb-6 font-semibold">
         {hasMultipleTraceLetters ? `Letter ${traceIndex + 1} of ${traceLetters.length} · ` : ''}

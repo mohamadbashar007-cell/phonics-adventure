@@ -508,6 +508,16 @@
   }
 }
 
+/* Match Chrome's 75% desktop zoom for the menu and group-map pages only.
+   The compensated dimensions keep the scaled page filling the viewport. */
+@media (min-width: 1180px) {
+  .desktop-page-zoom-75 {
+    width: 100%;
+    min-height: 133.333333vh;
+    zoom: 0.75;
+  }
+}
+
 @media (min-width: 768px) {
   .map-cloud {
     width: 154px;

@@ -47,10 +47,20 @@ export const applyFallbackImage = (img: HTMLImageElement | null) => {
   if (img.dataset.fallbackCurrent && currentSource !== img.dataset.fallbackCurrent) {
     delete img.dataset.fallbackStage;
     delete img.dataset.fallbackCurrent;
+    delete img.dataset.fallbackOriginal;
   }
 
-  if (img.dataset.fallbackStage !== 'png') {
-    const pngAlternative = getPngAlternative(currentSource);
+  if (!img.dataset.fallbackStage) {
+    const retryUrl = `${currentSource}${currentSource.includes('?') ? '&' : '?'}imageRetry=${Date.now()}`;
+    img.dataset.fallbackStage = 'retry';
+    img.dataset.fallbackOriginal = currentSource;
+    img.dataset.fallbackCurrent = retryUrl;
+    img.src = retryUrl;
+    return;
+  }
+
+  if (img.dataset.fallbackStage === 'retry') {
+    const pngAlternative = getPngAlternative(img.dataset.fallbackOriginal || currentSource);
     if (pngAlternative && pngAlternative !== currentSource) {
       img.dataset.fallbackStage = 'png';
       img.dataset.fallbackCurrent = pngAlternative;

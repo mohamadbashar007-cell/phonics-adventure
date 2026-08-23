@@ -8,7 +8,8 @@ import { preloadImages } from '../../utils/preloadImages';
 import { assetUrl } from '../../utils/assetUrl';
 import { celebrateCorrectAnswer } from '../../utils/correctAnswerCelebration';
 import FeedbackToast from './FeedbackToast';
-import { formatInitialSoundCharacters, wordHasSound } from '../../utils/initialSound';
+import { formatInitialSoundCharacters } from '../../utils/initialSound';
+import { buildQuizQuestions } from '../../utils/quizQuestions';
 
 interface ChooseExerciseScreenProps {
   letter: any;
@@ -16,6 +17,13 @@ interface ChooseExerciseScreenProps {
   exerciseNumber: number;
   preserveLetterCase?: boolean;
   onComplete: (stars: number) => void;
+}
+
+export function getChooseExerciseImageSources(letter: any, exercise?: any, exerciseNumber = 1) {
+  return buildQuizQuestions(letter, exercise, exerciseNumber)
+    .flatMap((question: any) => question.options || [])
+    .map((option: any) => option.image)
+    .filter((image: unknown): image is string => typeof image === 'string' && image.length > 0);
 }
 
 export default function ChooseExerciseScreen({
@@ -32,64 +40,10 @@ export default function ChooseExerciseScreen({
   const announcedPromptRef = useRef('');
   const correctAdvanceTimeoutRef = useRef<number | null>(null);
 
-  const chooseData = letter.choose || exercise;
-  const quizQuestions = useMemo<any[]>(() => {
-    if (!String(letter.id || '').startsWith('capital-')) {
-      const target = letter.letter || letter.id;
-      const sourceOptions = chooseData?.options ?? [];
-      const vocabulary = (letter.vocabulary || []).filter((item: any) => item?.word && item?.image);
-      const correctVocabularyWord = vocabulary.find((item: any) => wordHasSound(item.word, target));
-
-      if (correctVocabularyWord) {
-        const distractors = sourceOptions
-          .filter((option: any) => String(option?.word || '').toLowerCase() !== correctVocabularyWord.word.toLowerCase())
-          .map((option: any) => ({ ...option, isCorrect: false }));
-        return [{
-          target,
-          options: [{ ...correctVocabularyWord, isCorrect: true }, ...distractors].slice(0, 3),
-        }];
-      }
-
-      const reviewSounds = (letter.activities || [])
-        .filter((activity: any) => activity?.type === 'REVISION')
-        .flatMap((activity: any) => activity?.sounds || [])
-        .map((sound: string) => String(sound).trim())
-        .filter((sound: string) => sound && sound.toLowerCase() !== String(target).toLowerCase());
-      const distractors = Array.from(new Set(reviewSounds)).slice(-2);
-
-      return [{
-        target,
-        letterOnly: true,
-        options: [
-          { word: target, isCorrect: true },
-          ...distractors.map((word) => ({ word, isCorrect: false })),
-        ],
-      }];
-    }
-
-    const lessonLetters = String(letter.letter || '').match(/[A-Z]/g) || [];
-    const vocabulary = (letter.vocabulary || []).filter((item: any) => item?.word && item?.image);
-
-    return lessonLetters.map((target: string, targetIndex: number) => {
-      const correct = vocabulary.find((item: any) => wordHasSound(item.word, target));
-      const distractorPool = vocabulary.filter(
-        (item: any) => !wordHasSound(item.word, target) && item.word !== correct?.word,
-      );
-      const rotatedDistractors = distractorPool.length
-        ? [...distractorPool.slice(targetIndex % distractorPool.length), ...distractorPool.slice(0, targetIndex % distractorPool.length)]
-        : [];
-
-      return {
-        target,
-        options: correct
-          ? [
-              { ...correct, isCorrect: true },
-              ...rotatedDistractors.slice(0, 2).map((item: any) => ({ ...item, isCorrect: false })),
-            ]
-          : [],
-      };
-    }).filter((question: any) => question.options.length > 0).slice(0, 3);
-  }, [chooseData?.options, letter.id, letter.letter, letter.vocabulary]);
+  const quizQuestions = useMemo<any[]>(
+    () => buildQuizQuestions(letter, exercise, exerciseNumber),
+    [exercise, exerciseNumber, letter],
+  );
   const currentQuestion = quizQuestions[Math.min(questionIndex, quizQuestions.length - 1)];
   const options = currentQuestion?.options ?? [];
   const shuffledOptions = useMemo(() => {
@@ -118,7 +72,12 @@ export default function ChooseExerciseScreen({
       ],
       { priority: true },
     );
-  }, [options, questionIndex, quizQuestions]);
+    audioService.preloadPromptAudio(prompt);
+    options.forEach((option: any) => audioService.preloadPromptAudio(option.word));
+    (quizQuestions[questionIndex + 1]?.options || []).forEach((option: any) => {
+      audioService.preloadPromptAudio(option.word);
+    });
+  }, [options, prompt, questionIndex, quizQuestions]);
 
   useEffect(() => {
     if (correctAdvanceTimeoutRef.current !== null) {
@@ -276,7 +235,7 @@ export default function ChooseExerciseScreen({
                 onError={handleImageError}
                 loading="eager"
                 fetchPriority="high"
-                decoding="async"
+                decoding="sync"
                 className="h-[clamp(7rem,19dvh,11rem)] w-full rounded-2xl object-contain p-1 sm:p-2 md:h-[clamp(6rem,24vw,11rem)]"
               />
             )}

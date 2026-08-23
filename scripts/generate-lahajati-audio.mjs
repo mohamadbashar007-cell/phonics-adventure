@@ -33,14 +33,6 @@ function sanitizeAudioKey(value) {
     .replace(/^-+|-+$/g, '');
 }
 
-function getStoryBlendSentences(text) {
-  return String(text || '')
-    .split(/(?<=[.!?])\s+/)
-    .map((sentence) => sentence.trim())
-    .filter((sentence) => (sentence.match(/[A-Za-z]+(?:'[A-Za-z]+)?/g) || []).length >= 3)
-    .slice(0, 3);
-}
-
 function buildJobs() {
   const curriculum = JSON.parse(fs.readFileSync(CURRICULUM_PATH, 'utf8'));
   const recordedPrompts = JSON.parse(fs.readFileSync(RECORDED_PROMPTS_PATH, 'utf8'));
@@ -67,7 +59,6 @@ function buildJobs() {
       for (const item of letter.vocabulary || []) {
         registerVocabularyAudio(item.word);
       }
-      if (group.id === 7) getStoryBlendSentences(letter.story?.text).forEach(registerVocabularyAudio);
 
       if (!letter.story?.text) continue;
       const storyUrl = (letter.story.audio || `/audio/stories/${sanitizeAudioKey(letter.id)}-story.mp3`).split('?')[0];

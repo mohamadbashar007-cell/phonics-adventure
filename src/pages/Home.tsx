@@ -61,7 +61,7 @@ export default function Home() {
   const floatingDecor = ['a', 'b', 'c', 'd', '⭐', '✨', 'm', 's'];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-peach-50 via-peach-100 to-pink-50 p-4 md:p-8">
+    <div className="desktop-page-zoom-75 min-h-screen bg-gradient-to-br from-peach-50 via-peach-100 to-pink-50 p-4 md:p-8">
       {/* Start Overlay */}
       {!hasInteracted && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-white/80 backdrop-blur-sm">

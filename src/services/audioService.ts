@@ -3,18 +3,15 @@ import { getLessonAudioSources, getRecordedVocabularyAudioPath } from '../utils/
 
 const MAX_CACHED_AUDIO_BUFFERS = 18;
 const MAX_CONCURRENT_AUDIO_PRELOADS = 3;
-// A missing/cached-failed recording must fall back to speech promptly instead
-// of leaving a lesson question waiting several seconds for network audio.
+// A missing/cached-failed recording must fail promptly instead of leaving a
+// lesson question waiting several seconds for network audio.
 const AUDIO_FETCH_TIMEOUT_MS = 3_000;
 // On slower phones, do not leave a child waiting on an uncached recording.
-// The download continues for the next attempt while speech starts promptly.
+// The download continues for the next attempt.
 const AUDIO_PLAYBACK_BUFFER_WAIT_MS = 1_200;
 const AUDIO_CONTEXT_RESUME_TIMEOUT_MS = 1_500;
-
-const FEMALE_VOICE_NAMES =
-  /\b(ana|aria|ava(?:multilingual)?|emma|female|fiona|hazel|jenny(?:multilingual)?|joanna|karen|kendra|kimberly|libby|linda|mary|michelle|moira|natasha|samantha|serena|salli|sara|shelley|sonia|susan|tessa|victoria|zira)\b/i;
-const MALE_VOICE_NAMES =
-  /\b(alex|brian|christopher|daniel|david|eric|fred|guy|james|joey|justin|mark|matthew|michael|ryan|thomas|tom)\b/i;
+const HTML_AUDIO_START_TIMEOUT_MS = 6_000;
+const AUDIO_PLAYBACK_WATCHDOG_PADDING_MS = 4_000;
 
 type AudioPreloadTask = {
   src: string;
@@ -26,110 +23,57 @@ type AudioPreloadTask = {
 
 class AudioService {
   private isPlaying = false;
-  private utterance: SpeechSynthesisUtterance | null = null;
   private audioContext: AudioContext | null = null;
   private audioSource: AudioBufferSourceNode | null = null;
   private currentAudioSrc: string | null = null;
   private fallbackAudioElement: HTMLAudioElement | null = null;
   private finishCurrent: (() => void) | null = null;
-  private fallbackTimer: ReturnType<typeof setTimeout> | null = null;
-  private voicesPromise: Promise<SpeechSynthesisVoice[]> | null = null;
-  private voicesCache: SpeechSynthesisVoice[] = [];
-  private preferredVoiceUri: string | null = null;
   private audioBufferCache = new Map<string, AudioBuffer>();
   private audioPreloadTasks = new Map<string, AudioPreloadTask>();
   private highPriorityAudioQueue: AudioPreloadTask[] = [];
   private backgroundAudioQueue: AudioPreloadTask[] = [];
   private activeAudioPreloads = 0;
   private playbackVersion = 0;
+  private unlockListenersInstalled = false;
 
-  private clearFallbackTimer() {
-    if (this.fallbackTimer) {
-      clearTimeout(this.fallbackTimer);
-      this.fallbackTimer = null;
-    }
+  private unlockFromUserGesture = () => {
+    const context = this.getAudioContext();
+    if (!context) return;
+    if (context.state === 'running') return;
+
+    void context.resume()
+      .then(() => undefined)
+      .catch(() => {
+        // The permanent listeners retry on the next trusted interaction.
+      });
+  };
+
+  private installUnlockListeners() {
+    if (this.unlockListenersInstalled || typeof window === 'undefined') return;
+    this.unlockListenersInstalled = true;
+    window.addEventListener('pointerdown', this.unlockFromUserGesture, true);
+    window.addEventListener('keydown', this.unlockFromUserGesture, true);
+  }
+
+  private prefersNativeAudio() {
+    if (typeof window === 'undefined') return false;
+    return ['localhost', '127.0.0.1', '::1'].includes(window.location.hostname);
   }
 
   private resolveCurrent() {
     const finish = this.finishCurrent;
     this.finishCurrent = null;
-    this.clearFallbackTimer();
     this.isPlaying = false;
-    this.utterance = null;
     if (finish) finish();
-  }
-
-  private rememberVoices(voices: SpeechSynthesisVoice[]) {
-    const uniqueVoices = [...new Map(voices.map((voice) => [voice.voiceURI, voice])).values()];
-    if (uniqueVoices.length > 0) this.voicesCache = uniqueVoices;
-    return uniqueVoices;
-  }
-
-  private async getVoices() {
-    if (typeof window === 'undefined' || !window.speechSynthesis) return [];
-
-    const availableVoices = this.rememberVoices(window.speechSynthesis.getVoices());
-    if (availableVoices.length > 0) return availableVoices;
-    if (this.voicesCache.length > 0) return this.voicesCache;
-
-    if (!this.voicesPromise) {
-      this.voicesPromise = new Promise<SpeechSynthesisVoice[]>((resolve) => {
-        let settled = false;
-        const finish = () => {
-          if (settled) return;
-          settled = true;
-          clearTimeout(timeout);
-          window.speechSynthesis.removeEventListener('voiceschanged', finish);
-          resolve(this.rememberVoices(window.speechSynthesis.getVoices()));
-        };
-        const timeout = globalThis.setTimeout(finish, 800);
-        window.speechSynthesis.addEventListener('voiceschanged', finish, { once: true });
-      }).finally(() => {
-        this.voicesPromise = null;
-      });
-    }
-
-    return this.voicesPromise;
   }
 
   warmup() {
     if (typeof window === 'undefined') return;
-    if (window.speechSynthesis) void this.getVoices();
     this.getAudioContext();
-  }
-
-  private voiceScore(voice: SpeechSynthesisVoice) {
-    const name = voice.name.toLowerCase();
-    const language = voice.lang.toLowerCase();
-    let score = 0;
-
-    // Prefer a known female voice first, then a fast installed English voice.
-    if (FEMALE_VOICE_NAMES.test(name)) score += 1000;
-    if (MALE_VOICE_NAMES.test(name)) score -= 1000;
-    if (voice.localService) score += 200;
-    if (language === 'en-us') score += 80;
-    else if (language.startsWith('en-us')) score += 70;
-    else if (language === 'en-gb') score += 60;
-    else if (language.startsWith('en')) score += 40;
-    if (voice.default) score += 5;
-
-    return score;
-  }
-
-  private getPreferredVoice(voices: SpeechSynthesisVoice[]) {
-    const englishVoices = voices.filter((voice) => voice.lang.toLowerCase().startsWith('en'));
-    if (englishVoices.length === 0) return undefined;
-
-    if (this.preferredVoiceUri) {
-      const savedVoice = englishVoices.find((voice) => voice.voiceURI === this.preferredVoiceUri);
-      if (savedVoice) return savedVoice;
-    }
-
-    const preferredVoice = [...englishVoices].sort(
-      (left, right) => this.voiceScore(right) - this.voiceScore(left)
-    )[0];
-    this.preferredVoiceUri = preferredVoice?.voiceURI ?? null;
-    return preferredVoice;
+    this.installUnlockListeners();
+    // When warmup is called by a navigation button, this resume request still
+    // runs inside the trusted user gesture. The listeners cover effect calls.
+    this.unlockFromUserGesture();
   }
 
   private getAudioContext() {
@@ -250,56 +194,6 @@ class AudioService {
     return task.promise;
   }
 
-  async speak(text: string): Promise<void> {
-    if (!text || text.trim().length === 0) return;
-    if (typeof window === 'undefined' || !window.speechSynthesis) return;
-
-    this.stop();
-    const version = this.playbackVersion;
-    this.isPlaying = true;
-
-    // Waiting once for the complete voice list avoids the first phrase using the
-    // OS default voice and later phrases suddenly switching to another voice.
-    const voices = await this.getVoices();
-    if (version !== this.playbackVersion) return;
-
-    return new Promise((resolve) => {
-      this.finishCurrent = resolve;
-
-      const utterance = new SpeechSynthesisUtterance(text);
-      this.utterance = utterance;
-      utterance.lang = 'en-US';
-      utterance.rate = 0.9;
-      utterance.pitch = 1.08;
-      utterance.volume = 1;
-
-      const preferredVoice = this.getPreferredVoice(voices);
-      if (preferredVoice) utterance.voice = preferredVoice;
-
-      utterance.onend = () => {
-        if (this.utterance !== utterance || version !== this.playbackVersion) return;
-        this.resolveCurrent();
-      };
-      utterance.onerror = (event) => {
-        if (this.utterance !== utterance || version !== this.playbackVersion) return;
-        if (event.error !== 'canceled' && event.error !== 'interrupted') {
-          console.error('Speech synthesis error:', event);
-        }
-        this.resolveCurrent();
-      };
-
-      window.speechSynthesis.resume();
-      window.speechSynthesis.speak(utterance);
-
-      const fallbackMs = Math.min(15_000, Math.max(2_500, text.length * 150));
-      this.fallbackTimer = globalThis.setTimeout(() => {
-        if (this.utterance !== utterance || version !== this.playbackVersion) return;
-        window.speechSynthesis.cancel();
-        this.resolveCurrent();
-      }, fallbackMs);
-    });
-  }
-
   private async playWithHtmlAudio(src: string, version: number) {
     if (typeof Audio === 'undefined') return false;
 
@@ -308,12 +202,15 @@ class AudioService {
       this.fallbackAudioElement = audio;
       audio.preload = 'auto';
       let settled = false;
+      let watchdogId = globalThis.setTimeout(() => finish(false), HTML_AUDIO_START_TIMEOUT_MS);
       const finish = (played: boolean) => {
         if (settled) return;
         settled = true;
+        globalThis.clearTimeout(watchdogId);
         if (this.finishCurrent === cancelPlayback) this.finishCurrent = null;
         audio.onended = null;
         audio.onerror = null;
+        audio.onplaying = null;
         if (this.fallbackAudioElement === audio) this.fallbackAudioElement = null;
         this.isPlaying = false;
         resolve(played);
@@ -322,13 +219,24 @@ class AudioService {
       this.finishCurrent = cancelPlayback;
       audio.onended = () => finish(version === this.playbackVersion);
       audio.onerror = () => finish(false);
+      audio.onplaying = () => {
+        globalThis.clearTimeout(watchdogId);
+        const durationMs = Number.isFinite(audio.duration) && audio.duration > 0
+          ? audio.duration * 1_000
+          : 30_000;
+        watchdogId = globalThis.setTimeout(
+          () => finish(false),
+          durationMs + AUDIO_PLAYBACK_WATCHDOG_PADDING_MS,
+        );
+      };
       this.isPlaying = true;
       audio.play().catch(() => finish(false));
     });
   }
 
   private resumeAudioContext(context: AudioContext) {
-    if (context.state !== 'suspended') return Promise.resolve(true);
+    if (context.state === 'running') return Promise.resolve(true);
+    if (context.state === 'closed') return Promise.resolve(false);
 
     return new Promise<boolean>((resolve) => {
       let settled = false;
@@ -354,6 +262,15 @@ class AudioService {
     const resolvedSrc = assetUrl(src);
     const context = this.getAudioContext();
 
+    // Native media playback is substantially lighter on a local development
+    // server: it streams the MP3 instead of fetching and decoding several
+    // recordings in JavaScript at the same time. Keep Web Audio as the fallback
+    // for browsers that reject an automatic HTMLMediaElement play request.
+    if (this.prefersNativeAudio()) {
+      const playedNatively = await this.playWithHtmlAudio(resolvedSrc, version);
+      if (playedNatively || version !== this.playbackVersion) return playedNatively;
+    }
+
     // Start resume while the click still has browser user activation. Decoding
     // continues in parallel if the preload has not completed yet.
     const resumePromise = context ? this.resumeAudioContext(context) : Promise.resolve(false);
@@ -363,12 +280,8 @@ class AudioService {
         globalThis.setTimeout(() => resolve(null), AUDIO_PLAYBACK_BUFFER_WAIT_MS);
       }),
     ]);
-    if (!buffer || version !== this.playbackVersion || !context) {
-      if (!context && version === this.playbackVersion) {
-        return this.playWithHtmlAudio(resolvedSrc, version);
-      }
-      return false;
-    }
+    if (version !== this.playbackVersion) return false;
+    if (!buffer || !context) return this.playWithHtmlAudio(resolvedSrc, version);
 
     try {
       const contextIsReady = await resumePromise;
@@ -384,9 +297,14 @@ class AudioService {
         this.isPlaying = true;
 
         let settled = false;
+        const watchdogId = globalThis.setTimeout(
+          () => finish(false),
+          Math.max(1_000, source.buffer.duration * 1_000) + AUDIO_PLAYBACK_WATCHDOG_PADDING_MS,
+        );
         const finish = (played: boolean) => {
           if (settled) return;
           settled = true;
+          globalThis.clearTimeout(watchdogId);
           source.onended = null;
           if (this.audioSource === source) this.audioSource = null;
           if (this.currentAudioSrc === resolvedSrc) this.currentAudioSrc = null;
@@ -409,16 +327,14 @@ class AudioService {
     if (!text || !text.trim()) return;
 
     const recordedAudio = getRecordedVocabularyAudioPath(text);
-    if (recordedAudio) {
-      const expectedPlaybackVersion = this.playbackVersion + 1;
-      const played = await this.playAudioFile(recordedAudio);
-      if (played) return;
-      // A newer playback request stopped this one. Do not let the stale request
-      // start speech synthesis and cancel the audio the child just requested.
-      if (this.playbackVersion !== expectedPlaybackVersion) return;
-    }
+    if (!recordedAudio) return;
+    await this.playAudioFile(recordedAudio);
+  }
 
-    await this.speak(text);
+  // Kept as a compatibility alias for older callers. It deliberately plays
+  // bundled recordings only and never invokes the browser's speech engine.
+  async speak(text: string): Promise<void> {
+    await this.playPrompt(text);
   }
 
   preloadPromptAudio(text?: string | null) {
@@ -428,13 +344,19 @@ class AudioService {
   }
 
   preloadLessonAudio(letter: any) {
-    const [storyAudio, ...otherAudio] = getLessonAudioSources(letter);
-    if (storyAudio) this.preloadAudioFile(storyAudio, { priority: true });
-    otherAudio.forEach((src) => this.preloadAudioFile(src, { priority: false }));
+    const [, ...otherAudio] = getLessonAudioSources(letter);
+    // The start screen now plays the letter sound and shows the video instead
+    // of the old story, so its narration is deliberately skipped. Loading only
+    // the first two word recordings prevents 20+ lesson files competing at startup.
+    otherAudio.slice(0, 2).forEach((src) => this.preloadAudioFile(src, { priority: false }));
   }
 
   preloadAudioFile(src?: string | null, options: { priority?: boolean } = {}) {
     if (!src || typeof window === 'undefined') return;
+    // On localhost the visible/active recording uses the browser's native
+    // streaming path. Avoid background Web Audio decoding competing with image
+    // decoding on slower development machines.
+    if (this.prefersNativeAudio()) return;
     void this.requestAudioBuffer(assetUrl(src), options.priority ?? true);
   }
 
@@ -461,13 +383,9 @@ class AudioService {
     }
 
     this.resolveCurrent();
-    if (typeof window !== 'undefined' && window.speechSynthesis) {
-      window.speechSynthesis.cancel();
-    }
 
     this.currentAudioSrc = null;
     this.isPlaying = false;
-    this.utterance = null;
   }
 }
 

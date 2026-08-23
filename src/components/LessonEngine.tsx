@@ -1,11 +1,11 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useProgressStore } from '@/lib/store';
-import { preloadLessonCriticalImages, preloadLessonImages } from '@/utils/preloadImages';
+import { preloadImages } from '@/utils/preloadImages';
 import StoryScreen from './lesson/StoryScreen';
 import VocabularyScreen from './lesson/VocabularyScreen';
 import TracingScreen from './lesson/TracingScreen';
-import ChooseExerciseScreen from './lesson/ChooseExerciseScreen';
+import ChooseExerciseScreen, { getChooseExerciseImageSources } from './lesson/ChooseExerciseScreen';
 import ListenAndChooseScreen from './lesson/ListenAndChooseScreen';
 import ActivityLessonScreen from './lesson/ActivityLessonScreen';
 import CelebrationScreen from './lesson/CelebrationScreen';
@@ -77,7 +77,7 @@ export default function LessonEngine({ groupId, letter, onComplete, onExit }: Le
       .filter((section) => (
         (isCapitalGroup
           ? section.key !== 'tap'
-          : section.key !== 'match' && section.key !== 'segment')
+          : section.key !== 'segment')
         && !(omitsEarlyGroupOneBlend && section.key === 'blend')
       ))
       .map((section) => {
@@ -99,7 +99,7 @@ export default function LessonEngine({ groupId, letter, onComplete, onExit }: Le
   const hasChooseActivity = !isCapitalGroup;
   const traceLetters = useMemo(() => getTraceLettersForLesson(groupId, letter), [groupId, letter]);
   const lessonFlow: Array<{ key: LessonScreen; label: string }> = [
-    { key: 'story', label: 'Story' },
+    { key: 'story', label: 'Start' },
     { key: 'vocabulary', label: 'Words' },
     { key: 'tracing', label: 'Trace' },
     ...(hasChooseActivity ? [{ key: 'choose' as const, label: 'Quiz' }] : []),
@@ -112,8 +112,13 @@ export default function LessonEngine({ groupId, letter, onComplete, onExit }: Le
 
   useEffect(() => {
     audioService.warmup();
-    preloadLessonCriticalImages(letter, { priority: true });
-    preloadLessonImages(letter, { defer: false });
+    preloadImages(
+      (letter.vocabulary || []).slice(0, 2).map((item) => item.image),
+      { limit: 2 },
+    );
+    preloadImages(getChooseExerciseImageSources(letter, letter.exercises?.[0], 1), {
+      limit: 3,
+    });
     audioService.preloadLessonAudio(letter);
     traceLetters.forEach((traceLetter) => preloadLetterTrace(traceLetter));
   }, [letter, traceLetters]);
@@ -307,7 +312,7 @@ export default function LessonEngine({ groupId, letter, onComplete, onExit }: Le
             )}
 
             {visibleActivitySections.map((section) => (
-              currentScreen === section.key && section.key !== 'match' && !(isCapitalGroup && section.key === 'blend') ? (
+              currentScreen === section.key && !(isCapitalGroup && section.key === 'match') && !(isCapitalGroup && section.key === 'blend') ? (
                 <ActivityLessonScreen
                   key={section.key}
                   letter={letter}
@@ -340,7 +345,8 @@ export default function LessonEngine({ groupId, letter, onComplete, onExit }: Le
 
 function getTraceLettersForLesson(groupId: number, letter: { id: string; letter: string }) {
   if (groupId !== 7) {
-    return [(letter.letter || letter.id || 'a').toLowerCase()];
+    const traceValue = (letter.letter || letter.id || 'a').toLowerCase();
+    return traceValue === 'ck' ? ['c', 'k'] : [traceValue];
   }
 
   const capitalLetters = (letter.letter || '').match(/[A-Z]/g) || [];

@@ -119,9 +119,9 @@ export default function CapitalLowercaseMatchScreen({ letter, onComplete }: Capi
               <motion.line
                 key={capital}
                 x1="25"
-                y1={rowPosition(lowercaseIndex, lowercaseOrder.length)}
+                y1={rowPosition(capitalIndex, capitalOrder.length)}
                 x2="75"
-                y2={rowPosition(capitalIndex, capitalOrder.length)}
+                y2={rowPosition(lowercaseIndex, lowercaseOrder.length)}
                 stroke="#10b981"
                 strokeWidth="1.8"
                 strokeLinecap="round"
@@ -134,31 +134,6 @@ export default function CapitalLowercaseMatchScreen({ letter, onComplete }: Capi
         </svg>
 
         <div className="absolute inset-y-4 left-4 flex w-[24%] flex-col justify-around md:left-7">
-          {lowercaseOrder.map((lowercase) => {
-            const matched = matchedCapitals.includes(lowercase.toUpperCase());
-            return (
-              <motion.button
-                key={lowercase}
-                type="button"
-                whileHover={!matched ? { scale: 1.08 } : undefined}
-                whileTap={!matched ? { scale: 0.92 } : undefined}
-                onClick={() => chooseLowercase(lowercase)}
-                disabled={matched}
-                className={`grid h-16 w-16 place-items-center self-center rounded-2xl border-4 text-4xl font-black shadow-lg transition md:h-20 md:w-20 md:text-5xl ${
-                  matched
-                    ? 'border-emerald-400 bg-emerald-100 text-emerald-700'
-                    : selectedLowercase === lowercase
-                      ? 'border-indigo-500 bg-indigo-100 text-indigo-700 ring-4 ring-indigo-200'
-                      : 'border-white bg-gradient-to-br from-cyan-400 to-blue-500 text-white'
-                }`}
-              >
-                {lowercase}
-              </motion.button>
-            );
-          })}
-        </div>
-
-        <div className="absolute inset-y-4 right-4 flex w-[24%] flex-col justify-around md:right-7">
           {capitalOrder.map((capital) => {
             const matched = matchedCapitals.includes(capital);
             return (
@@ -178,6 +153,31 @@ export default function CapitalLowercaseMatchScreen({ letter, onComplete }: Capi
                 }`}
               >
                 {capital}
+              </motion.button>
+            );
+          })}
+        </div>
+
+        <div className="absolute inset-y-4 right-4 flex w-[24%] flex-col justify-around md:right-7">
+          {lowercaseOrder.map((lowercase) => {
+            const matched = matchedCapitals.includes(lowercase.toUpperCase());
+            return (
+              <motion.button
+                key={lowercase}
+                type="button"
+                whileHover={!matched ? { scale: 1.08 } : undefined}
+                whileTap={!matched ? { scale: 0.92 } : undefined}
+                onClick={() => chooseLowercase(lowercase)}
+                disabled={matched}
+                className={`grid h-16 w-16 place-items-center self-center rounded-2xl border-4 text-4xl font-black shadow-lg transition md:h-20 md:w-20 md:text-5xl ${
+                  matched
+                    ? 'border-emerald-400 bg-emerald-100 text-emerald-700'
+                    : selectedLowercase === lowercase
+                      ? 'border-indigo-500 bg-indigo-100 text-indigo-700 ring-4 ring-indigo-200'
+                      : 'border-white bg-gradient-to-br from-cyan-400 to-blue-500 text-white'
+                }`}
+              >
+                {lowercase}
               </motion.button>
             );
           })}

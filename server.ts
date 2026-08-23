@@ -13,6 +13,7 @@ async function startServer() {
   
   const app = express();
   const port = Number(process.env.PORT ?? 3000);
+  const isProduction = process.env.NODE_ENV === 'production';
 
   // tRPC middleware
   app.use(
@@ -27,6 +28,16 @@ async function startServer() {
     express.static(path.join(process.cwd(), 'public'), {
       maxAge: '365d',
       setHeaders: (res, filePath) => {
+        if (!isProduction) {
+          // Development assets change frequently. A year-long immutable cache
+          // can preserve a stale or interrupted media response across restarts.
+          res.setHeader('Cache-Control', 'no-store');
+          if (/\.(mp4|webm|mp3|png|jpe?g|webp|svg|ttf|woff2?)$/i.test(filePath)) {
+            res.setHeader('Accept-Ranges', 'bytes');
+          }
+          return;
+        }
+
         if (filePath.endsWith('.html') || filePath.endsWith('.json')) {
           res.setHeader('Cache-Control', 'no-cache');
           return;
@@ -40,7 +51,7 @@ async function startServer() {
     })
   );
 
-  if (process.env.NODE_ENV !== 'production') {
+  if (!isProduction) {
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: 'spa',
@@ -69,7 +80,9 @@ async function startServer() {
     });
   }
 
-  app.listen(port, '0.0.0.0', () => {
+  // Bind to the platform's dual-stack wildcard so localhost can use ::1 or
+  // 127.0.0.1 without waiting for an IPv6 connection to fail first.
+  app.listen(port, () => {
     console.log(`Server running at http://localhost:${port}`);
   });
 }

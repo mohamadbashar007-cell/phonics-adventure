@@ -28,6 +28,7 @@ export default function GroupRevisionScreen({ groupId, group, onComplete, onExit
   const [revealed, setRevealed] = useState(false);
   const [speakingWord, setSpeakingWord] = useState('');
   const playbackIdRef = useRef(0);
+  const announcedLetterRef = useRef('');
   const currentLetter = letters[letterIndex];
   const words = useMemo(() => (currentLetter?.vocabulary || []).slice(0, 3), [currentLetter]);
   const isLastLetter = letterIndex === letters.length - 1;
@@ -50,8 +51,6 @@ export default function GroupRevisionScreen({ groupId, group, onComplete, onExit
     audioService.stop();
   }, []);
 
-  if (!currentLetter) return null;
-
   const playWord = async (word: string) => {
     playbackIdRef.current += 1;
     setSpeakingWord(word);
@@ -62,8 +61,8 @@ export default function GroupRevisionScreen({ groupId, group, onComplete, onExit
     }
   };
 
-  const revealWords = async () => {
-    soundEffects.playClick();
+  const revealWords = async (playClick = true) => {
+    if (playClick) soundEffects.playClick();
     if (revealed) {
       await playWord(currentLetter.letter || currentLetter.id);
       return;
@@ -84,6 +83,21 @@ export default function GroupRevisionScreen({ groupId, group, onComplete, onExit
     if (playbackIdRef.current === playbackId) setSpeakingWord('');
   };
 
+  useEffect(() => {
+    if (!currentLetter) return;
+    const announcementKey = `${groupId}-${currentLetter.id}`;
+    if (announcedLetterRef.current === announcementKey) return;
+
+    const timeoutId = window.setTimeout(() => {
+      announcedLetterRef.current = announcementKey;
+      void revealWords(false);
+    }, 300);
+
+    return () => window.clearTimeout(timeoutId);
+    // The revision narration runs once whenever a new letter card appears.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [groupId, currentLetter?.id]);
+
   const advance = () => {
     soundEffects.playClick();
     playbackIdRef.current += 1;
@@ -98,6 +112,8 @@ export default function GroupRevisionScreen({ groupId, group, onComplete, onExit
     setRevealed(false);
     setLetterIndex((index) => index + 1);
   };
+
+  if (!currentLetter) return null;
 
   return (
     <div className="relative flex min-h-dvh flex-col overflow-hidden bg-gradient-to-br from-cyan-100 via-indigo-100 to-pink-100 px-4 py-5 text-slate-800 md:px-8">

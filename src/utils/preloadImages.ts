@@ -4,7 +4,8 @@ const completedImages = new Set<string>();
 const queuedImages = new Map<string, ImageLoadTask>();
 const highPriorityQueue: ImageLoadTask[] = [];
 const backgroundQueue: ImageLoadTask[] = [];
-const MAX_CONCURRENT_IMAGE_PRELOADS = 4;
+const MAX_CONCURRENT_IMAGE_PRELOADS = 2;
+const IMAGE_PRELOAD_TIMEOUT_MS = 8_000;
 let activeImagePreloads = 0;
 
 type PreloadOptions = {
@@ -36,8 +37,8 @@ function scheduleIdle(callback: () => void) {
   globalThis.setTimeout(callback, 80);
 }
 
-function finishImageTask(task: ImageLoadTask) {
-  completedImages.add(task.src);
+function finishImageTask(task: ImageLoadTask, loaded: boolean) {
+  if (loaded) completedImages.add(task.src);
   queuedImages.delete(task.src);
   activeImagePreloads = Math.max(0, activeImagePreloads - 1);
   drainImageQueue();
@@ -52,16 +53,18 @@ function startImageTask(task: ImageLoadTask) {
   image.fetchPriority = task.priority ? 'high' : 'low';
 
   let finished = false;
-  const finish = () => {
+  const timeoutId = globalThis.setTimeout(() => finish(false), IMAGE_PRELOAD_TIMEOUT_MS);
+  const finish = (loaded: boolean) => {
     if (finished) return;
     finished = true;
+    globalThis.clearTimeout(timeoutId);
     image.onload = null;
     image.onerror = null;
-    finishImageTask(task);
+    finishImageTask(task, loaded);
   };
 
-  image.onload = finish;
-  image.onerror = finish;
+  image.onload = () => finish(true);
+  image.onerror = () => finish(false);
   image.src = task.src;
 }
 

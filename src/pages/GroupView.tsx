@@ -16,6 +16,7 @@ import { audioService } from '@/services/audioService';
 import { preloadImages, preloadLessonCriticalImages } from '@/utils/preloadImages';
 import { assetUrl } from '@/utils/assetUrl';
 import { getGroupMapSource } from '@/utils/groupAssets';
+import { handleImageError } from '@/utils/imagePaths';
 import curriculum from '../data/curriculum.json';
 
 type ViewMode = 'map' | 'lesson' | 'revision' | 'exam' | 'exam-result' | 'group-complete';
@@ -420,7 +421,7 @@ export default function GroupView() {
     const examUnlocked = devMode || allLettersCompleted;
 
     return (
-      <div className="group-one-screen min-h-screen overflow-x-hidden bg-[#26BDEB] px-3 py-4 text-slate-700 sm:px-5">
+      <div className="desktop-page-zoom-75 group-one-screen min-h-screen overflow-x-hidden bg-[#26BDEB] px-3 py-4 text-slate-700 sm:px-5">
         <main className="mx-auto flex w-full max-w-[1060px] flex-col gap-4">
           <header className="group-one-header">
             <div className="mb-4 flex items-center justify-between gap-4">
@@ -465,6 +466,7 @@ export default function GroupView() {
             <img
               src={assetUrl(imageMapConfig.src)}
               alt=""
+              onError={handleImageError}
               loading="eager"
               fetchPriority="high"
               decoding="async"
@@ -556,7 +558,7 @@ export default function GroupView() {
   }
 
   return (
-    <div className="lesson-map-screen min-h-screen overflow-x-hidden bg-[#1CB8E9] text-slate-700">
+    <div className="desktop-page-zoom-75 lesson-map-screen min-h-screen overflow-x-hidden bg-[#1CB8E9] text-slate-700">
       <div className="relative z-40 bg-gradient-to-b from-[#C7F3FF] via-[#BCEEFF]/96 to-[#BCEEFF]/0 px-5 pb-4 pt-5 md:px-10">
         <div className="mx-auto max-w-6xl">
           <div className="mb-4 flex items-center justify-between">

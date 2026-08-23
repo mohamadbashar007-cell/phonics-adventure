@@ -3,7 +3,7 @@ import recordedAudioConfig from '../data/recordedAudioConfig.json';
 import recordedAudioPrompts from '../data/recordedAudioPrompts.json';
 
 // Make phones retry recordings that may have been cached as a failed request.
-const AUDIO_CACHE_VERSION = '20260818-story-blend-clips';
+const AUDIO_CACHE_VERSION = '20260823-word-only-tag';
 
 function withAudioVersion(value: string) {
   if (!value) return '';
@@ -19,6 +19,15 @@ function sanitizeAudioKey(value: string) {
 }
 
 const recordedVocabularyAudio = new Map<string, string>();
+
+// In the c/k balloon questions both spellings represent the same /k/ sound.
+// The bundled recording is stored under "ck", so keep these sound-only
+// prompts pointed at that recording instead of requesting missing c.mp3 and
+// k.mp3 files.
+const recordedSoundAudioAliases = new Map<string, string>([
+  ['c', '/audio/vocabulary/ck.mp3'],
+  ['k', '/audio/vocabulary/ck.mp3'],
+]);
 
 export function getStoryBlendSentences(text: unknown): string[] {
   return String(text || '')
@@ -82,10 +91,15 @@ export function getVocabularyAudioPath(word: string) {
   return key ? withAudioVersion(`/audio/vocabulary/${key}.mp3`) : '';
 }
 
+export function getAlphabetTrainLetterAudioPath(letter: string) {
+  const key = sanitizeAudioKey(letter);
+  return /^[a-z]$/.test(key) ? withAudioVersion(`/audio/train/${key}.mp3`) : '';
+}
+
 export function getRecordedVocabularyAudioPath(text: string) {
   const key = sanitizeAudioKey(text);
   if (!key) return '';
-  return withAudioVersion(recordedVocabularyAudio.get(key) || '');
+  return withAudioVersion(recordedSoundAudioAliases.get(key) || recordedVocabularyAudio.get(key) || '');
 }
 
 export function getLessonAudioSources(letter: any) {

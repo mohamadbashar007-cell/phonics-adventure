@@ -1,14 +1,17 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { AnimatePresence, motion, type PanInfo } from 'framer-motion';
-import { Check, Loader2, Volume2, X } from 'lucide-react';
+import { Check, Loader2, Sparkles, Volume2, X } from 'lucide-react';
 import { audioService } from '../../services/audioService';
 import { soundEffects } from '../../services/soundEffects';
 import { getVocabularyImagePath, handleImageError } from '../../utils/imagePaths';
+import { preloadImages } from '../../utils/preloadImages';
 import { assetUrl } from '../../utils/assetUrl';
 import { celebrateCorrectAnswer } from '../../utils/correctAnswerCelebration';
+import { formatHearCheckSound, playHearCheckAudio, preloadHearCheckAudio } from '../../utils/hearCheckAudio';
 import FeedbackToast from './FeedbackToast';
-import { formatInitialSoundCharacters, startsWithInitialSoundCharacter } from '../../utils/initialSound';
+import { getInitialSoundCharacters, wordHasSound } from '../../utils/initialSound';
+import { BALLOON_DISTRACTORS, buildBalloonOptions, type BalloonOption } from '../../utils/balloonOptions';
 
 interface ActivityLessonScreenProps {
   letter: any;
@@ -19,17 +22,12 @@ interface ActivityLessonScreenProps {
 
 type OptionValue = string | { word?: string; label?: string; image?: string };
 
-type BalloonOption = {
-  id: string;
-  label: string;
-  isCorrect: boolean;
-};
-
 type Step = {
   mode: 'choice' | 'segment' | 'blend' | 'review' | 'sound-match' | 'balloon-choice';
   prompt: string;
   instruction?: string;
   audioText?: string;
+  hearCheckSound?: string;
   imageAudioText?: string;
   options?: OptionValue[];
   correctAnswer?: string;
@@ -54,10 +52,6 @@ type BlendTile = {
   id: string;
   letter: string;
 };
-
-const BALLOON_DISTRACTORS = [
-  's', 'a', 't', 'i', 'p', 'n', 'c', 'k', 'e', 'h', 'r', 'm', 'd', 'g', 'o', 'u', 'l', 'f', 'b', 'j', 'z', 'w', 'v', 'y', 'x', 'q',
-];
 
 const BALLOON_STYLES = [
   { body: 'from-pink-400 to-rose-500', knot: 'bg-rose-500', string: 'bg-rose-300' },
@@ -212,43 +206,6 @@ function shuffleStepOptions(options: OptionValue[], previousSignature = '') {
   return [...options].reverse();
 }
 
-function shuffleItems<T>(items: T[]) {
-  const shuffled = [...items];
-  for (let index = shuffled.length - 1; index > 0; index -= 1) {
-    const swapIndex = Math.floor(Math.random() * (index + 1));
-    [shuffled[index], shuffled[swapIndex]] = [shuffled[swapIndex], shuffled[index]];
-  }
-  return shuffled;
-}
-
-function buildBalloonOptions(question: any, questionIndex: number): BalloonOption[] {
-  const correctAnswer = String(question?.correctAnswer || question?.audioSound || '').trim();
-  const correctKey = correctAnswer.toLowerCase();
-  const suppliedDistractors = (question?.options || [])
-    .map((option: OptionValue) => typeof option === 'string' ? option : option.word || option.label || '')
-    .map((option: string) => option.trim())
-    .filter((option: string) => option && option.toLowerCase() !== correctKey);
-  const distractors = Array.from(new Set(
-    [...suppliedDistractors, ...BALLOON_DISTRACTORS]
-      .filter((option) => option.toLowerCase() !== correctKey),
-  )).slice(0, 4);
-
-  const balloons = [
-    ...Array.from({ length: 3 }, (_, index) => ({
-      id: `q${questionIndex}-correct-${index}`,
-      label: correctAnswer,
-      isCorrect: true,
-    })),
-    ...distractors.map((label, index) => ({
-      id: `q${questionIndex}-wrong-${index}`,
-      label,
-      isCorrect: false,
-    })),
-  ];
-
-  return shuffleItems(balloons);
-}
-
 function getQuestionPicture(question: any) {
   if (question?.picture?.word || question?.picture?.image) {
     return {
@@ -293,7 +250,7 @@ function createBlendTiles(word: string): BlendTile[] {
   return shuffled;
 }
 
-function buildSteps(activity: any, lessonSound?: string): Step[] {
+export function buildActivitySteps(activity: any, lessonSound?: string): Step[] {
   const type = activity?.type;
   const instruction = activity?.instruction as string | undefined;
 
@@ -301,15 +258,12 @@ function buildSteps(activity: any, lessonSound?: string): Step[] {
     return (activity.items || []).map((item: any) => ({
       mode: 'choice',
       prompt: lessonSound
-        ? activity.checkMode === 'starts-with'
-          ? `Does the word start with ${formatInitialSoundCharacters(lessonSound)}?`
-          : `Does the word have the ${formatInitialSoundCharacters(lessonSound)} sound?`
-        : activity.checkMode === 'starts-with'
-          ? 'Does the word start with one of the lesson letters?'
-          : 'Does the word have the target sound?',
+        ? `Can you hear ${formatHearCheckSound(lessonSound)} in ...?`
+        : 'Can you hear the target sound in ...?',
       options: ['yes', 'no'],
       correctAnswer: item.answer,
       audioText: item.word,
+      hearCheckSound: lessonSound,
     }));
   }
 
@@ -317,10 +271,11 @@ function buildSteps(activity: any, lessonSound?: string): Step[] {
     return [
       {
         mode: 'sound-match',
-        prompt: 'Drag and drop',
+        prompt: 'Match the pictures to the sound',
+        instruction,
+        audioText: lessonSound,
         options: dedupeOptions(activity.words || []),
         desiredOptionCount: Math.max(6, activity.words?.length || 0),
-        correctAnswer: activity.correctAnswer,
       },
     ];
   }
@@ -353,7 +308,7 @@ function buildSteps(activity: any, lessonSound?: string): Step[] {
       prompt: 'Listen and pop the 3 matching balloons',
       correctAnswer: q.correctAnswer,
       audioText: q.audioSound,
-      balloons: buildBalloonOptions(q, questionIndex),
+      balloons: buildBalloonOptions(q, questionIndex, q.picture?.word || q.audioWord || ''),
     }));
   }
 
@@ -383,14 +338,19 @@ function buildSteps(activity: any, lessonSound?: string): Step[] {
       correctAnswer: q.correctAnswer,
       image: q.picture?.image,
       imageAudioText: q.picture?.word,
-      balloons: buildBalloonOptions(q, questionIndex),
+      balloons: buildBalloonOptions(q, questionIndex, q.picture?.word || q.audioWord || ''),
     }));
   }
 
   if (type === 'SAY_TAP' && activity.subtype !== 'LISTENING' && activity.questions?.length) {
     return activity.questions.map((q: any, questionIndex: number) => {
       const picture = getQuestionPicture(q);
-      const soundTarget = extractSoundTarget(q.prompt) || q.correctAnswer || q.audioSound || '';
+      const lessonSounds = getInitialSoundCharacters(lessonSound);
+      const requestedSound = String(extractSoundTarget(q.prompt) || '').toLowerCase();
+      const soundTarget = lessonSounds.find((sound) => sound === requestedSound)
+        || lessonSounds.find((sound) => wordHasSound(picture.word, sound))
+        || lessonSounds[0]
+        || '';
 
       return {
         mode: 'balloon-choice',
@@ -404,6 +364,7 @@ function buildSteps(activity: any, lessonSound?: string): Step[] {
           // This activity's balloons must always be letter/sound choices instead.
           { ...q, options: [], correctAnswer: soundTarget, audioSound: soundTarget },
           questionIndex,
+          picture.word,
         ),
       };
     });
@@ -439,6 +400,10 @@ export default function ActivityLessonScreen({ letter, activities: activityOverr
     const text = String(value || '');
     return preserveLetterCase ? text : text.toLowerCase();
   };
+  const displayBalloonText = (value?: string) => {
+    const text = String(value || '');
+    return preserveLetterCase ? text.toUpperCase() : text.toLowerCase();
+  };
   const activities = useMemo(() => {
     if (activityOverride) return activityOverride.filter((activity: any) => !isRevisionIntro(activity));
     return (letter?.activities || []).filter(
@@ -463,12 +428,13 @@ export default function ActivityLessonScreen({ letter, activities: activityOverr
   const poppedBalloonIdsRef = useRef<Set<string>>(new Set());
   const choiceLockedRef = useRef(false);
   const advanceLockedRef = useRef(false);
-  const announcedHearCheckRef = useRef('');
+  const announcedStepAudioRef = useRef('');
   const announcedImageAudioRef = useRef('');
-  const soundMatchTargetRef = useRef<HTMLDivElement>(null);
+  const soundMatchTargetRef = useRef<HTMLButtonElement>(null);
   const soundMatchOptionRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
   const matchedSoundWordsRef = useRef<Set<string>>(new Set());
   const soundMatchLockedRef = useRef(false);
+  const soundMatchDraggedWordRef = useRef('');
   const audioPlaybackRequestRef = useRef(0);
 
   const currentActivity = activities[activityIndex];
@@ -476,7 +442,7 @@ export default function ActivityLessonScreen({ letter, activities: activityOverr
   const activeStepKeyRef = useRef(activeStepKey);
   activeStepKeyRef.current = activeStepKey;
   const steps = useMemo(
-    () => buildSteps(currentActivity, letter?.letter || letter?.id),
+    () => buildActivitySteps(currentActivity, letter?.letter || letter?.id),
     [currentActivity, letter?.id, letter?.letter],
   );
   const wordImageMap = useMemo(() => buildWordImageMap(letter), [letter]);
@@ -528,6 +494,7 @@ export default function ActivityLessonScreen({ letter, activities: activityOverr
     });
   }, [preparedOptionsByStep]);
   const currentStep = steps[stepIndex];
+  const nextStep = steps[stepIndex + 1];
   const displayChoiceOptions = shuffledOptionsByStep[stepIndex] || currentStep?.options || [];
   const normalizedChoiceOptions = useMemo(
     () => displayChoiceOptions.map((option) => normalizeOption(option, wordImageMap)),
@@ -546,7 +513,7 @@ export default function ActivityLessonScreen({ letter, activities: activityOverr
     return rawTarget.toLowerCase().replace(/[^a-z]/g, '') || rawTarget;
   }, [letter?.id, letter?.letter]);
   const soundMatchAnswers = useMemo(
-    () => soundMatchOptions.filter((option) => startsWithInitialSoundCharacter(option.value, soundMatchTarget)),
+    () => soundMatchOptions.filter((option) => wordHasSound(option.value, soundMatchTarget)),
     [soundMatchOptions, soundMatchTarget],
   );
 
@@ -568,7 +535,10 @@ export default function ActivityLessonScreen({ letter, activities: activityOverr
     advanceLockedRef.current = false;
     matchedSoundWordsRef.current = new Set();
     soundMatchLockedRef.current = false;
-    if (currentStep?.audioText) {
+    soundMatchDraggedWordRef.current = '';
+    if (currentActivity?.type === 'HEAR_CHECK' && currentStep?.hearCheckSound && currentStep.audioText) {
+      preloadHearCheckAudio(currentStep.hearCheckSound, currentStep.audioText);
+    } else if (currentStep?.audioText) {
       audioService.preloadPromptAudio(currentStep.audioText);
     }
     if (currentStep?.imageAudioText) {
@@ -577,19 +547,34 @@ export default function ActivityLessonScreen({ letter, activities: activityOverr
     if (currentStep?.mode === 'sound-match') {
       soundMatchOptions.forEach((option) => audioService.preloadPromptAudio(option.value));
     }
-  }, [activityIndex, stepIndex, currentStep?.mode]);
+    if (nextStep?.hearCheckSound && nextStep.audioText) {
+      preloadHearCheckAudio(nextStep.hearCheckSound, nextStep.audioText);
+    } else if (nextStep?.audioText) {
+      audioService.preloadPromptAudio(nextStep.audioText);
+    }
+    if (nextStep?.imageAudioText) audioService.preloadPromptAudio(nextStep.imageAudioText);
+    (nextStep?.options || []).slice(0, 3).forEach((option) => {
+      const word = typeof option === 'string' ? option : option?.word || option?.label;
+      if (word) audioService.preloadPromptAudio(word);
+    });
+  }, [activityIndex, stepIndex, currentStep?.mode, nextStep]);
 
   // HEAR_CHECK questions can deliberately use a word from another lesson as
   // the wrong answer (for example, "dog" in A–B–C). Load every question in
   // the section upfront, rather than beginning that request when it appears.
   useEffect(() => {
-    activities.forEach((activity) => {
-      if (activity?.type !== 'HEAR_CHECK') return;
-      (activity.items || []).forEach((item: any) => {
-        if (typeof item?.word === 'string') audioService.preloadPromptAudio(item.word);
-      });
-    });
-  }, [activities]);
+    const imagesForStep = (step?: Step) => [
+      step?.image,
+      ...(step?.options || []).map((option) => {
+        if (typeof option === 'string') return wordImageMap.get(option.trim().toLowerCase());
+        const word = String(option?.word || option?.label || '').trim().toLowerCase();
+        return option?.image || wordImageMap.get(word);
+      }),
+    ];
+
+    preloadImages(imagesForStep(currentStep), { priority: true });
+    preloadImages(imagesForStep(nextStep), { limit: 4 });
+  }, [currentStep, nextStep, wordImageMap]);
 
   useEffect(() => {
     const updateBalloonViewportHeight = () => setBalloonViewportHeight(window.innerHeight);
@@ -622,21 +607,35 @@ export default function ActivityLessonScreen({ letter, activities: activityOverr
 
     const requestId = audioPlaybackRequestRef.current + 1;
     audioPlaybackRequestRef.current = requestId;
+    const expectedStepKey = activeStepKey;
+    let cancelled = false;
+    const isCurrentRequest = () => (
+      !cancelled
+      && audioPlaybackRequestRef.current === requestId
+      && activeStepKeyRef.current === expectedStepKey
+    );
     if (isLoadingAudio) audioService.stop();
     setIsLoadingAudio(true);
     let timeoutId: number | undefined;
 
     try {
+      const playback = currentActivity?.type === 'HEAR_CHECK' && currentStep.hearCheckSound
+        ? playHearCheckAudio(currentStep.hearCheckSound, currentStep.audioText, isCurrentRequest)
+        : audioService.playPrompt(currentStep.audioText);
       const finished = await Promise.race([
-        audioService.playPrompt(currentStep.audioText).then(() => true),
+        playback.then(() => true),
         new Promise<boolean>((resolve) => {
-          timeoutId = window.setTimeout(() => resolve(false), 6_000);
+          timeoutId = window.setTimeout(() => resolve(false), currentStep.hearCheckSound ? 10_000 : 6_000);
         }),
       ]);
 
-      if (!finished) audioService.stop();
+      if (!finished) {
+        cancelled = true;
+        audioService.stop();
+      }
     } catch (error) {
       console.error('Prompt audio playback failed:', error);
+      cancelled = true;
       audioService.stop();
     } finally {
       if (timeoutId !== undefined) window.clearTimeout(timeoutId);
@@ -644,20 +643,20 @@ export default function ActivityLessonScreen({ letter, activities: activityOverr
     }
   };
 
-  const hearCheckAudioKey = `${letter.id}-${activityIndex}-${stepIndex}-${currentStep?.audioText || ''}`;
+  const stepAudioKey = `${letter.id}-${activityIndex}-${stepIndex}-${currentStep?.audioText || ''}`;
   const imageAudioKey = `${letter.id}-${activityIndex}-${stepIndex}-${currentStep?.imageAudioText || ''}`;
 
   useEffect(() => {
-    if (currentActivity?.type !== 'HEAR_CHECK' || !currentStep?.audioText) return;
-    if (announcedHearCheckRef.current === hearCheckAudioKey) return;
+    if (!currentStep?.audioText) return;
+    if (announcedStepAudioRef.current === stepAudioKey) return;
 
     const timeoutId = window.setTimeout(() => {
-      announcedHearCheckRef.current = hearCheckAudioKey;
+      announcedStepAudioRef.current = stepAudioKey;
       void playAudio();
     }, 300);
 
     return () => window.clearTimeout(timeoutId);
-  }, [hearCheckAudioKey, currentActivity?.type]);
+  }, [stepAudioKey, currentActivity?.type]);
 
   useEffect(() => {
     if (!currentStep?.imageAudioText || announcedImageAudioRef.current === imageAudioKey) return;
@@ -750,6 +749,37 @@ export default function ActivityLessonScreen({ letter, activities: activityOverr
     void audioService.playPrompt(word);
   };
 
+  const matchSoundWord = (word: string) => {
+    if (soundMatchLockedRef.current || matchedSoundWordsRef.current.has(word)) return;
+    const answeredStepKey = activeStepKey;
+
+    if (!wordHasSound(word, soundMatchTarget)) {
+      setFeedback({ type: 'error', text: 'Try another picture! \u{1F4AA}' });
+      soundEffects.playError();
+      window.setTimeout(() => {
+        if (activeStepKeyRef.current === answeredStepKey) setFeedback(null);
+      }, 750);
+      return;
+    }
+
+    const nextMatched = new Set(matchedSoundWordsRef.current);
+    nextMatched.add(word);
+    matchedSoundWordsRef.current = nextMatched;
+    setMatchedSoundWords(nextMatched);
+    soundEffects.playSuccess();
+
+    if (soundMatchAnswers.length > 0 && nextMatched.size >= soundMatchAnswers.length) {
+      soundMatchLockedRef.current = true;
+      setFeedback({ type: 'success', text: 'Excellent matching! \u{1F389}' });
+      celebrateCorrectAnswer();
+      window.setTimeout(() => {
+        if (activeStepKeyRef.current !== answeredStepKey) return;
+        setFeedback(null);
+        advance(answeredStepKey);
+      }, 1200);
+    }
+  };
+
   const handleSoundMatchDrop = (word: string, info: PanInfo) => {
     setActiveSoundWord('');
     if (soundMatchLockedRef.current || matchedSoundWordsRef.current.has(word)) return;
@@ -776,29 +806,7 @@ export default function ActivityLessonScreen({ letter, activities: activityOverr
       targetRect && (pointerIsNearLetter || pictureOverlapsLetter),
     );
     if (!wasDroppedOnLetter) return;
-
-    if (!startsWithInitialSoundCharacter(word, soundMatchTarget)) {
-      setFeedback({ type: 'error', text: 'Try another picture! \u{1F4AA}' });
-      soundEffects.playError();
-      window.setTimeout(() => setFeedback(null), 750);
-      return;
-    }
-
-    const nextMatched = new Set(matchedSoundWordsRef.current);
-    nextMatched.add(word);
-    matchedSoundWordsRef.current = nextMatched;
-    setMatchedSoundWords(nextMatched);
-    soundEffects.playSuccess();
-
-    if (soundMatchAnswers.length > 0 && nextMatched.size >= soundMatchAnswers.length) {
-      soundMatchLockedRef.current = true;
-      setFeedback({ type: 'success', text: 'Excellent matching! \u{1F389}' });
-      celebrateCorrectAnswer();
-      window.setTimeout(() => {
-        setFeedback(null);
-        advance();
-      }, 1200);
-    }
+    matchSoundWord(word);
   };
 
   const handleSegmentTap = (sound: string) => {
@@ -909,7 +917,7 @@ export default function ActivityLessonScreen({ letter, activities: activityOverr
       </h2>
       {!isListeningBalloon && currentStep.sentence && <p className="relative z-20 mb-6 text-xl font-bold text-gray-700">{displayText(currentStep.sentence)}</p>}
 
-      {currentStep.audioText && (
+      {currentStep.audioText && currentStep.mode !== 'sound-match' && (
         <button
           type="button"
           onClick={playAudio}
@@ -1083,17 +1091,35 @@ export default function ActivityLessonScreen({ letter, activities: activityOverr
           className="relative grid min-h-[30rem] w-full max-w-5xl grid-cols-3 gap-2 md:min-h-[36rem] md:gap-6"
           style={{ gridTemplateRows: 'repeat(3, minmax(110px, 1fr))' }}
         >
-          <motion.div
+          <motion.button
+            type="button"
             ref={soundMatchTargetRef}
+            onClick={() => void playAudio()}
             animate={activeSoundWord ? { scale: [1, 1.04, 1] } : { scale: 1 }}
             transition={activeSoundWord ? { duration: 0.9, repeat: Infinity } : { duration: 0.2 }}
-            className={`relative z-10 col-start-2 row-start-2 m-auto grid h-36 w-36 place-items-center rounded-full border-[7px] bg-gradient-to-br from-blue-500 to-indigo-700 text-white shadow-2xl transition-colors md:h-52 md:w-52 ${
+            className={`relative isolate z-10 col-start-2 row-start-2 m-auto grid h-36 w-36 place-items-center rounded-full border-[7px] bg-gradient-to-br from-cyan-400 via-blue-600 to-violet-700 text-white shadow-[0_20px_50px_rgba(67,56,202,0.38)] transition-all md:h-52 md:w-52 ${
               activeSoundWord ? 'border-yellow-300 ring-8 ring-yellow-200/60' : 'border-white'
             }`}
-            aria-label={`Drop pictures for the letter ${soundMatchTarget} here`}
+            aria-label={`Play the ${soundMatchTarget} sound and drop matching pictures here`}
           >
-            <span className={`text-7xl font-black drop-shadow-lg md:text-9xl ${preserveLetterCase ? '' : 'lowercase'}`}>
+            <span
+              aria-hidden="true"
+              className={`absolute -inset-5 -z-10 rounded-full border-2 border-dashed opacity-80 animate-[spin_14s_linear_infinite] ${
+                activeSoundWord ? 'border-yellow-400' : 'border-violet-300'
+              }`}
+            />
+            <span aria-hidden="true" className="absolute -inset-2 -z-20 rounded-full bg-gradient-to-br from-cyan-300 via-blue-400 to-fuchsia-400 opacity-40 blur-lg" />
+            <span aria-hidden="true" className="absolute inset-2 rounded-full border-2 border-white/35 shadow-inner" />
+            <span aria-hidden="true" className="absolute -left-4 top-1/2 h-4 w-4 -translate-y-1/2 rounded-full bg-amber-300 shadow-[0_0_16px_rgba(252,211,77,0.9)]" />
+            <span aria-hidden="true" className="absolute -right-3 top-8 h-3 w-3 rounded-full bg-pink-300 shadow-[0_0_14px_rgba(249,168,212,0.9)] md:top-12" />
+            <Sparkles aria-hidden="true" className="absolute left-5 top-4 text-yellow-200 drop-shadow-md md:left-8 md:top-7" size={26} />
+
+            <span className={`relative z-10 text-7xl font-black tracking-tight text-white drop-shadow-[0_7px_4px_rgba(30,41,59,0.24)] md:text-9xl ${preserveLetterCase ? '' : 'lowercase'}`}>
               {displayText(letter.letter || soundMatchTarget)}
+            </span>
+
+            <span className="absolute bottom-1 right-1 z-20 grid h-10 w-10 place-items-center rounded-full bg-gradient-to-br from-white to-blue-50 text-violet-600 shadow-[0_7px_16px_rgba(30,64,175,0.35)] ring-3 ring-white/80 md:bottom-3 md:right-3 md:h-12 md:w-12">
+              {isLoadingAudio ? <Loader2 className="animate-spin" size={24} /> : <Volume2 size={25} />}
             </span>
 
             <div className="absolute -bottom-5 left-1/2 flex -translate-x-1/2 items-center justify-center -space-x-2">
@@ -1120,7 +1146,7 @@ export default function ActivityLessonScreen({ letter, activities: activityOverr
                   </motion.span>
                 ))}
             </div>
-          </motion.div>
+          </motion.button>
 
           {soundMatchOptions.map((option, idx) => {
             const sixSlotOrder = [0, 2, 3, 5, 6, 8, 1, 7];
@@ -1153,12 +1179,24 @@ export default function ActivityLessonScreen({ letter, activities: activityOverr
                   whileHover={!isMatched ? { scale: 1.08, rotate: idx % 2 === 0 ? -2 : 2 } : undefined}
                   whileTap={!isMatched ? { scale: 0.96, cursor: 'grabbing' } : undefined}
                   onPointerDown={() => playSoundMatchWord(option.value)}
+                  onClick={() => {
+                    if (soundMatchDraggedWordRef.current === option.value) return;
+                    matchSoundWord(option.value);
+                  }}
                   onKeyDown={(event) => {
                     if (event.key === 'Enter' || event.key === ' ') playSoundMatchWord(option.value);
                   }}
-                  onDragStart={() => setActiveSoundWord(option.value)}
-                  onDragEnd={(_, info) => handleSoundMatchDrop(option.value, info)}
-                  aria-label={`Picture of ${option.label}. Drag it to the letter if it starts with ${soundMatchTarget}`}
+                  onDragStart={() => {
+                    soundMatchDraggedWordRef.current = option.value;
+                    setActiveSoundWord(option.value);
+                  }}
+                  onDragEnd={(_, info) => {
+                    handleSoundMatchDrop(option.value, info);
+                    window.setTimeout(() => {
+                      if (soundMatchDraggedWordRef.current === option.value) soundMatchDraggedWordRef.current = '';
+                    }, 0);
+                  }}
+                  aria-label={`Picture of ${option.label}. Drag or tap it if it has the ${soundMatchTarget} sound`}
                   className={`relative grid h-24 w-24 touch-none cursor-grab place-items-center overflow-hidden rounded-[1.75rem] border-4 bg-white p-2 shadow-xl active:cursor-grabbing sm:h-28 sm:w-28 md:h-36 md:w-36 ${
                     activeSoundWord === option.value ? 'z-30 border-yellow-400' : 'z-20 border-white hover:border-blue-200'
                   }`}
@@ -1230,14 +1268,14 @@ export default function ActivityLessonScreen({ letter, activities: activityOverr
                       transition={{ duration: isPopped ? 0.28 : 0.35, delay: isPopped ? 0 : idx * 0.045 }}
                       whileHover={!isPopped ? { scale: 1.08 } : undefined}
                       whileTap={!isPopped ? { scale: 0.9 } : undefined}
-                      aria-label={`Balloon with letter ${displayText(balloon.label)}`}
+                      aria-label={`Balloon with letter ${displayBalloonText(balloon.label)}`}
                       className="flex w-full flex-col items-center rounded-full focus:outline-none focus-visible:ring-4 focus-visible:ring-yellow-300 disabled:pointer-events-none"
                     >
                       <span
                         className={`relative grid aspect-[0.86] w-full place-items-center rounded-[52%_52%_48%_48%] bg-gradient-to-br ${style.body} text-4xl font-black text-white shadow-xl ring-4 ring-white/80 md:text-5xl`}
                       >
                         <span className="absolute left-[22%] top-[16%] h-5 w-3 -rotate-12 rounded-full bg-white/45" aria-hidden="true" />
-                        {displayText(balloon.label)}
+                        {displayBalloonText(balloon.label)}
                       </span>
                       <span className={`-mt-1 h-4 w-4 rotate-45 rounded-sm ${style.knot}`} aria-hidden="true" />
                       <span className={`h-10 w-0.5 ${style.string}`} aria-hidden="true" />

@@ -2,6 +2,8 @@ import { getInitialSoundCharacters, startsWithInitialSoundCharacter, wordHasSoun
 
 export const MAX_QUESTIONS_PER_TYPE = 3;
 
+const hearFalsePositionByLesson = new Map<string, number>();
+
 export type ActivitySectionKey = 'hear' | 'match' | 'blend' | 'segment' | 'balloons' | 'tap';
 
 export type ActivitySection = {
@@ -107,6 +109,21 @@ function capActivities(activities: any[]) {
   return capped;
 }
 
+function arrangeHearQuestions(correctWords: Array<string | undefined>, falseWord: string | undefined, lessonKey: string) {
+  const correct = Array.from(new Set(correctWords.filter((word): word is string => Boolean(word)))).slice(0, 2);
+  if (!falseWord || correct.length < 2) return [...correct, falseWord].filter(Boolean) as string[];
+
+  let falsePosition = hearFalsePositionByLesson.get(lessonKey);
+  if (falsePosition === undefined) {
+    falsePosition = Math.floor(Math.random() * MAX_QUESTIONS_PER_TYPE);
+    hearFalsePositionByLesson.set(lessonKey, falsePosition);
+  }
+
+  const ordered = [...correct];
+  ordered.splice(falsePosition, 0, falseWord);
+  return ordered;
+}
+
 function makeHearActivity(letter: any, words: Array<{ word?: string }>) {
   const target = letter?.letter || letter?.id;
   const matching = words.filter((item) => wordHasSound(item.word, target));
@@ -115,9 +132,11 @@ function makeHearActivity(letter: any, words: Array<{ word?: string }>) {
     ...getHearDistractors(letter, target),
   ];
   const falseWord = distractors.find(Boolean);
-  const ordered = [matching[0]?.word, falseWord, matching[1]?.word]
-    .filter((word, index, items): word is string => Boolean(word) && items.indexOf(word) === index)
-    .slice(0, MAX_QUESTIONS_PER_TYPE);
+  const ordered = arrangeHearQuestions(
+    matching.map((item) => item.word),
+    falseWord,
+    `sound:${String(letter?.id || target)}`,
+  );
 
   return {
     type: 'HEAR_CHECK',
@@ -136,9 +155,11 @@ function makeCapitalHearActivity(letter: any, words: Array<{ word?: string }>) {
     ...words.map((item) => item.word || ''),
     ...getHearDistractors(letter, target),
   ].find((word) => word && !startsWithInitialSoundCharacter(word, target));
-  const ordered = [matching[0]?.word, falseWord, matching[1]?.word]
-    .filter((word, index, items): word is string => Boolean(word) && items.indexOf(word) === index)
-    .slice(0, MAX_QUESTIONS_PER_TYPE);
+  const ordered = arrangeHearQuestions(
+    matching.map((item) => item.word),
+    falseWord,
+    `initial:${String(letter?.id || target)}`,
+  );
 
   return {
     type: 'HEAR_CHECK',
@@ -151,17 +172,21 @@ function makeCapitalHearActivity(letter: any, words: Array<{ word?: string }>) {
   };
 }
 
-function makeMatchActivity(letter: any, words: Array<{ word?: string }>) {
+function makeMatchActivity(
+  letter: any,
+  words: Array<{ word?: string; image?: string }>,
+  vocabulary: Array<{ word?: string; image?: string }> = [],
+) {
   const target = letter?.letter || letter?.id;
-  const matching = words.filter((item) => startsWithInitialSoundCharacter(item.word, target));
-  const distractors = words.filter((item) => !startsWithInitialSoundCharacter(item.word, target));
-  const selected = dedupeWords([...matching.slice(0, 3), ...distractors.slice(0, 3)]).map((item) => item.word);
+  const pictureWords = dedupeWords([...vocabulary, ...words]).filter((item) => item.word && item.image);
+  const matching = pictureWords.filter((item) => wordHasSound(item.word, target));
+  const distractors = pictureWords.filter((item) => !wordHasSound(item.word, target));
+  const selected = dedupeWords([...matching.slice(0, 3), ...distractors.slice(0, 3)]);
 
   return {
     type: 'ODD_OUT',
-    instruction: 'Drag the pictures that start with the target sound',
+    instruction: 'Drag or tap the pictures that have the target sound',
     words: selected,
-    correctAnswer: distractors[0]?.word,
   };
 }
 
@@ -226,15 +251,47 @@ function makeBalloonsActivity(letter: any, vocabulary: Array<{ word?: string; im
 
 function makeTapActivity(letter: any, words: Array<{ word?: string; image?: string }>) {
   const target = letter?.letter || letter?.id;
-  const matching = words.filter((item) => startsWithInitialSoundCharacter(item.word, target));
-  const distractors = words.filter((item) => !startsWithInitialSoundCharacter(item.word, target));
+  const sounds = getInitialSoundCharacters(target);
+  const candidates = dedupeWords(words).filter((item) => (
+    item.word
+    && item.image
+    && sounds.some((sound) => wordHasSound(item.word, sound))
+  ));
+  const selected: Array<{ word?: string; image?: string; sound: string }> = [];
+  const usedWords = new Set<string>();
+
+  // Multi-letter capital lessons get one picture for each new letter first.
+  // Single-sound lessons then fill the remaining questions from their other
+  // vocabulary pictures (for example on, dog, and hop for the o lesson).
+  sounds.forEach((sound) => {
+    const match = candidates.find((item) => {
+      const key = String(item.word || '').toLowerCase();
+      return !usedWords.has(key)
+        && (String(letter?.id || '').startsWith('capital-')
+          ? startsWithInitialSoundCharacter(item.word, sound)
+          : wordHasSound(item.word, sound));
+    });
+    if (!match || selected.length >= MAX_QUESTIONS_PER_TYPE) return;
+    usedWords.add(String(match.word).toLowerCase());
+    selected.push({ ...match, sound });
+  });
+
+  candidates.forEach((item) => {
+    if (selected.length >= MAX_QUESTIONS_PER_TYPE) return;
+    const key = String(item.word || '').toLowerCase();
+    if (usedWords.has(key)) return;
+    const sound = sounds.find((unit) => wordHasSound(item.word, unit));
+    if (!sound) return;
+    usedWords.add(key);
+    selected.push({ ...item, sound });
+  });
 
   return {
     type: 'SAY_TAP',
-    instruction: 'Tap the picture that starts with the target sound',
-    questions: matching.slice(0, MAX_QUESTIONS_PER_TYPE).map((correct, index) => ({
-      prompt: `Sound is ${target}`,
-      options: [correct, distractors[index % Math.max(1, distractors.length)]].filter(Boolean),
+    instruction: 'Look, listen, and pop the lesson sound',
+    questions: selected.map((correct) => ({
+      prompt: `Sound is ${correct.sound}`,
+      options: [{ word: correct.word, image: correct.image }],
       correctAnswer: correct.word,
     })),
   };
@@ -252,21 +309,23 @@ export function getLessonActivitySections(letter: any): ActivitySection[] {
     hear: [String(letter?.id || '').startsWith('capital-')
       ? makeCapitalHearActivity(letter, vocabulary.length ? vocabulary : words)
       : makeHearActivity(letter, vocabulary.length ? vocabulary : words)],
-    match: byType(['ODD_OUT']),
+    // Match always uses one freshly built picture-to-letter question. This
+    // keeps old odd-one-out data from changing the format in individual lessons.
+    match: [makeMatchActivity(letter, words, vocabulary)],
     blend: byType(['BLEND']),
     segment: byType(['SEGMENT']),
     balloons: byType(['REVISION', 'TAP_SOUND', 'LOOK_SAY_TAP']).filter(
       (activity: any) => (activity?.questions || []).length || (activity?.sounds || []).length,
     ),
-    tap: source.filter((activity: any) =>
-      !['HEAR_CHECK', 'ODD_OUT', 'BLEND', 'SEGMENT', 'REVISION', 'TAP_SOUND', 'LOOK_SAY_TAP'].includes(activity?.type)
-      && activity?.subtype !== 'LISTENING',
-    ),
+    // Tap has one consistent format throughout the app: show a curriculum
+    // picture and pop balloons containing the lesson sound. Older PDF_EXTRA,
+    // listening, and two-picture choice activities must not leak into it.
+    tap: [makeTapActivity(letter, vocabulary.length ? vocabulary : words)],
   };
 
   const fallbacks: Record<ActivitySectionKey, any> = {
     hear: String(letter?.id || '').startsWith('capital-') ? makeCapitalHearActivity(letter, words) : makeHearActivity(letter, words),
-    match: makeMatchActivity(letter, words),
+    match: makeMatchActivity(letter, words, vocabulary),
     blend: makeBlendActivity(words),
     segment: makeSegmentActivity(words),
     balloons: makeBalloonsActivity(letter, vocabulary),

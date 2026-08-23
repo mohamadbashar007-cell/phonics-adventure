@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Volume2, Loader2, Mic } from 'lucide-react';
 import { audioService } from '../../services/audioService';
@@ -9,6 +9,7 @@ import { assetUrl } from '../../utils/assetUrl';
 import { getVocabularyAudioPath } from '../../utils/audioPaths';
 import { preloadImages } from '../../utils/preloadImages';
 import { celebrateCorrectAnswer } from '../../utils/correctAnswerCelebration';
+import { getInitialSoundCharacters, startsWithInitialSoundCharacter, wordHasSound } from '../../utils/initialSound';
 import FeedbackToast from './FeedbackToast';
 
 interface VocabularyScreenProps {
@@ -33,6 +34,7 @@ export default function VocabularyScreen({ letter, preserveLetterCase = false, o
   const [isSkipped, setIsSkipped] = useState(false);
   const [completedWords, setCompletedWords] = useState<Set<number>>(new Set());
   const [skippedWords, setSkippedWords] = useState<Set<number>>(new Set());
+  const announcedWordRef = useRef('');
 
   const vocab = useMemo(() => letter.vocabulary || [], [letter.vocabulary]);
   const currentItem = useMemo(() => vocab[currentIndex], [vocab, currentIndex]);
@@ -40,7 +42,12 @@ export default function VocabularyScreen({ letter, preserveLetterCase = false, o
   const displayWord = preserveLetterCase
     ? `${targetWord.charAt(0).toUpperCase()}${targetWord.slice(1)}`
     : targetWord.toLowerCase();
-  const displayLetter = preserveLetterCase ? letter.letter : String(letter.letter || '').toLowerCase();
+  const lessonSounds = getInitialSoundCharacters(letter.letter || letter.id);
+  const wordSound = lessonSounds.find((sound) => startsWithInitialSoundCharacter(targetWord, sound))
+    || lessonSounds.find((sound) => wordHasSound(targetWord, sound));
+  const displayLetter = preserveLetterCase
+    ? String(wordSound || targetWord.match(/[A-Za-z]/)?.[0] || letter.letter || '').toUpperCase()
+    : String(letter.letter || '').toLowerCase();
   const targetAudioSrc = useMemo(() => getVocabularyAudioPath(targetWord), [targetWord]);
   const canAdvance = feedback?.type === 'success' || isSkipped;
 
@@ -75,10 +82,7 @@ export default function VocabularyScreen({ letter, preserveLetterCase = false, o
     setIsLoading(true);
     try {
       const audioSrc = getVocabularyAudioPath(word);
-      const playedAudioFile = audioSrc ? await audioService.playAudioFile(audioSrc) : false;
-      if (!playedAudioFile) {
-        await audioService.speak(word);
-      }
+      if (audioSrc) await audioService.playAudioFile(audioSrc);
     } catch (error) {
       console.error('Audio service error in VocabularyScreen:', error);
       setFeedback({ type: 'error', text: 'Try again' });
@@ -86,6 +90,20 @@ export default function VocabularyScreen({ letter, preserveLetterCase = false, o
       setIsLoading(false);
     }
   };
+
+  useEffect(() => {
+    const announcementKey = `${letter.id}-${currentIndex}-${targetWord}`;
+    if (!targetWord || announcedWordRef.current === announcementKey) return;
+
+    const timeoutId = window.setTimeout(() => {
+      announcedWordRef.current = announcementKey;
+      void handlePlaySound(targetWord);
+    }, 300);
+
+    return () => window.clearTimeout(timeoutId);
+    // The key changes only when a new vocabulary card is shown.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [letter.id, currentIndex, targetWord]);
 
   const handlePronunciationCheck = async () => {
     if (isListening || isLoading || feedback?.type === 'success' || !targetWord) return;
@@ -179,7 +197,7 @@ export default function VocabularyScreen({ letter, preserveLetterCase = false, o
       <FeedbackToast feedback={feedback} />
 
       <h2 className="mb-4 text-3xl font-black text-gray-800 md:mb-8 md:text-4xl">
-        Words starting with '{displayLetter}'
+        Words with '{displayLetter}'
       </h2>
 
       <div className="relative mb-4 h-[min(48dvh,400px)] w-full max-w-md md:mb-8 md:h-[min(55dvh,450px)]">

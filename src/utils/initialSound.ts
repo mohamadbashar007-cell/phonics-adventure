@@ -22,7 +22,16 @@ export function startsWithInitialSoundCharacter(word: unknown, sound: unknown): 
 
 export function wordHasSound(word: unknown, sound: unknown): boolean {
   const normalizedWord = normalizeWord(word);
-  return getInitialSoundCharacters(sound).some((unit) => normalizedWord.includes(unit));
+  return getInitialSoundCharacters(sound).some((unit) => {
+    if (unit === 'ck') {
+      // The /k/ sound taught in the ck lesson can be written as "ck", "k",
+      // or a hard "c" before sounds other than e, i, y, and h (for example cap).
+      return normalizedWord.includes('ck')
+        || normalizedWord.startsWith('k')
+        || /^c(?![eiyh])/.test(normalizedWord);
+    }
+    return normalizedWord.includes(unit);
+  });
 }
 
 export function formatInitialSoundCharacters(sound: unknown, uppercase = false): string {
