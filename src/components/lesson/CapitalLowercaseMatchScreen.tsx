@@ -24,6 +24,23 @@ function shuffle<T>(items: T[]) {
   return result;
 }
 
+function createMatchOrders(capitals: string[]) {
+  const capitalOrder = shuffle(capitals);
+  let lowercaseOrder = shuffle(capitals.map((item) => item.toLowerCase()));
+
+  // Never present every matching pair directly opposite each other. A rotation
+  // guarantees at least one crossed connection even when both shuffles happen
+  // to produce the same relative order.
+  if (
+    lowercaseOrder.length > 1
+    && capitalOrder.every((capital, index) => capital.toLowerCase() === lowercaseOrder[index])
+  ) {
+    lowercaseOrder = [...lowercaseOrder.slice(1), lowercaseOrder[0]];
+  }
+
+  return { capitalOrder, lowercaseOrder };
+}
+
 export default function CapitalLowercaseMatchScreen({ letter, onComplete }: CapitalLowercaseMatchScreenProps) {
   const capitals = useMemo(
     () => Array.from(new Set(
@@ -31,8 +48,7 @@ export default function CapitalLowercaseMatchScreen({ letter, onComplete }: Capi
     )),
     [letter?.id, letter?.letter],
   );
-  const [lowercaseOrder, setLowercaseOrder] = useState<string[]>(() => shuffle(capitals.map((item) => item.toLowerCase())));
-  const [capitalOrder, setCapitalOrder] = useState<string[]>(() => shuffle(capitals));
+  const [{ lowercaseOrder, capitalOrder }, setLetterOrders] = useState(() => createMatchOrders(capitals));
   const [selectedCapital, setSelectedCapital] = useState('');
   const [selectedLowercase, setSelectedLowercase] = useState('');
   const [matchedCapitals, setMatchedCapitals] = useState<string[]>([]);
@@ -42,8 +58,7 @@ export default function CapitalLowercaseMatchScreen({ letter, onComplete }: Capi
   const wrongTimeoutRef = useRef<number | null>(null);
 
   useEffect(() => {
-    setLowercaseOrder(shuffle(capitals.map((item) => item.toLowerCase())));
-    setCapitalOrder(shuffle(capitals));
+    setLetterOrders(createMatchOrders(capitals));
     setSelectedCapital('');
     setSelectedLowercase('');
     setMatchedCapitals([]);

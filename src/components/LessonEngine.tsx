@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { useProgressStore } from '@/lib/store';
 import { preloadImages } from '@/utils/preloadImages';
 import StoryScreen from './lesson/StoryScreen';
@@ -217,7 +217,6 @@ export default function LessonEngine({ groupId, letter, onComplete, onExit }: Le
   const screenVariants = {
     enter: { opacity: 0, y: 20 },
     center: { opacity: 1, y: 0 },
-    exit: { opacity: 0, y: -20 },
   };
 
   return (
@@ -268,13 +267,11 @@ export default function LessonEngine({ groupId, letter, onComplete, onExit }: Le
       </div>
 
         <div className="relative z-0 min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain">
-        <AnimatePresence mode="popLayout">
           <motion.div
             key={currentScreen}
             variants={screenVariants}
             initial="enter"
             animate="center"
-            exit="exit"
             transition={{ duration: 0.3 }}
             className="w-full min-h-full flex flex-col"
           >
@@ -337,7 +334,6 @@ export default function LessonEngine({ groupId, letter, onComplete, onExit }: Le
               />
             )}
           </motion.div>
-        </AnimatePresence>
         </div>
       </div>
     </div>
