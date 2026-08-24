@@ -20,13 +20,15 @@ function sanitizeAudioKey(value: string) {
 
 const recordedVocabularyAudio = new Map<string, string>();
 
-// In the c/k balloon questions both spellings represent the same /k/ sound.
-// The bundled recording is stored under "ck", so keep these sound-only
-// prompts pointed at that recording instead of requesting missing c.mp3 and
-// k.mp3 files.
+// The c and k activities are presented separately, but their bundled audio is
+// still stored under the legacy "ck" filenames. Point both the sound-only and
+// quiz-question prompts at those recordings instead of requesting missing
+// c/k-specific files.
 const recordedSoundAudioAliases = new Map<string, string>([
   ['c', '/audio/vocabulary/ck.mp3'],
   ['k', '/audio/vocabulary/ck.mp3'],
+  ['c-is-for', '/audio/vocabulary/ck-is-for.mp3'],
+  ['k-is-for', '/audio/vocabulary/ck-is-for.mp3'],
 ]);
 
 export function getStoryBlendSentences(text: unknown): string[] {
@@ -94,6 +96,23 @@ export function getVocabularyAudioPath(word: string) {
 export function getAlphabetTrainLetterAudioPath(letter: string) {
   const key = sanitizeAudioKey(letter);
   return /^[a-z]$/.test(key) ? withAudioVersion(`/audio/train/${key}.mp3`) : '';
+}
+
+export function getCapitalIntroLetterAudioPath(letter: string) {
+  const key = sanitizeAudioKey(letter);
+  return /^[a-z]$/.test(key) ? withAudioVersion(`/audio/group-7-letters/${key}.mp3`) : '';
+}
+
+const introSoundAudioSequences = new Map<string, string[]>([
+  ['th', [
+    '/audio/vocabulary/th-1.mp3',
+    '/audio/vocabulary/th-2.mp3',
+  ]],
+]);
+
+export function getIntroSoundAudioPaths(sound: string) {
+  const key = sanitizeAudioKey(sound);
+  return (introSoundAudioSequences.get(key) || []).map(withAudioVersion);
 }
 
 export function getRecordedVocabularyAudioPath(text: string) {

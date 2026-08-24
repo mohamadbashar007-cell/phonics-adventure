@@ -238,7 +238,19 @@ const LETTER_PATHS: Record<string, DrawCommand[]> = {
   j: [{ type: 'M', x: 62, y: 46 }, { type: 'L', x: 62, y: 118 }, { type: 'C', x1: 62, y1: 150, x2: 20, y2: 148, x: 24, y: 118 }, { type: 'M', x: 62, y: 22 }, { type: 'L', x: 62, y: 22 }],
   k: [{ type: 'M', x: 24, y: 14 }, { type: 'L', x: 24, y: 118 }, { type: 'M', x: 82, y: 50 }, { type: 'L', x: 24, y: 86 }, { type: 'L', x: 86, y: 118 }],
   l: [{ type: 'M', x: 50, y: 14 }, { type: 'L', x: 50, y: 118 }],
-  m: [{ type: 'M', x: 12, y: 118 }, { type: 'L', x: 12, y: 52 }, { type: 'C', x1: 24, y1: 34, x2: 42, y2: 34, x: 50, y: 70 }, { type: 'C', x1: 58, y1: 34, x2: 88, y2: 34, x: 88, y: 118 }],
+  m: [
+    // Comic Sans-style lowercase m: a straight stem followed by two full,
+    // rounded shoulders. Each shoulder returns to the baseline so the middle
+    // stroke is clear instead of looking like one shallow double arch.
+    { type: 'M', x: 12, y: 42 },
+    { type: 'L', x: 12, y: 118 },
+    { type: 'M', x: 12, y: 56 },
+    { type: 'C', x1: 24, y1: 38, x2: 42, y2: 36, x: 52, y: 50 },
+    { type: 'C', x1: 62, y1: 64, x2: 62, y2: 88, x: 62, y: 118 },
+    { type: 'M', x: 62, y: 56 },
+    { type: 'C', x1: 72, y1: 38, x2: 88, y2: 38, x: 92, y: 54 },
+    { type: 'C', x1: 96, y1: 70, x2: 94, y2: 94, x: 94, y: 118 },
+  ],
   n: [
     // Comic Sans-style lowercase n: draw the stem from the top first,
     // then return near the top to form the soft, rounded shoulder.
@@ -260,15 +272,15 @@ const LETTER_PATHS: Record<string, DrawCommand[]> = {
   ],
   q: [
     // Comic Sans-style lowercase q: begin at the top of the rounded bowl,
-    // complete it in one handwriting stroke, then continue down the descender.
+    // complete it in one handwriting stroke, then continue straight down the
+    // descender. The straight ending keeps q distinct from the hooked g.
     { type: 'M', x: 50, y: 38 },
     { type: 'C', x1: 22, y1: 38, x2: 14, y2: 58, x: 16, y: 82 },
     { type: 'C', x1: 18, y1: 112, x2: 52, y2: 124, x: 70, y: 106 },
     { type: 'C', x1: 80, y1: 96, x2: 82, y2: 74, x: 76, y: 56 },
     { type: 'C', x1: 70, y1: 42, x2: 60, y2: 38, x: 50, y: 38 },
     { type: 'C', x1: 62, y1: 38, x2: 72, y2: 40, x: 78, y: 48 },
-    { type: 'L', x: 78, y: 142 },
-    { type: 'C', x1: 78, y1: 152, x2: 70, y2: 158, x: 64, y: 152 },
+    { type: 'L', x: 78, y: 154 },
   ],
   r: [
     // Comic Sans-style lowercase r: start at the top of the stem, draw

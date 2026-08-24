@@ -10,7 +10,7 @@ import { assetUrl } from '../../utils/assetUrl';
 import { celebrateCorrectAnswer } from '../../utils/correctAnswerCelebration';
 import { formatHearCheckSound, playHearCheckAudio, preloadHearCheckAudio } from '../../utils/hearCheckAudio';
 import FeedbackToast from './FeedbackToast';
-import { getInitialSoundCharacters, wordHasSound } from '../../utils/initialSound';
+import { getInitialSoundCharacters, getSoundCharacterForWord, wordHasSound } from '../../utils/initialSound';
 import { BALLOON_DISTRACTORS, buildBalloonOptions, type BalloonOption } from '../../utils/balloonOptions';
 
 interface ActivityLessonScreenProps {
@@ -255,25 +255,34 @@ export function buildActivitySteps(activity: any, lessonSound?: string): Step[] 
   const instruction = activity?.instruction as string | undefined;
 
   if (type === 'HEAR_CHECK') {
-    return (activity.items || []).map((item: any) => ({
-      mode: 'choice',
-      prompt: lessonSound
-        ? `Can you hear ${formatHearCheckSound(lessonSound)} in ...?`
-        : 'Can you hear the target sound in ...?',
-      options: ['yes', 'no'],
-      correctAnswer: item.answer,
-      audioText: item.word,
-      hearCheckSound: lessonSound,
-    }));
+    return (activity.items || []).map((item: any, itemIndex: number) => {
+      const lessonSounds = getInitialSoundCharacters(lessonSound);
+      const hearCheckSound = item.sound
+        || getSoundCharacterForWord(item.word, lessonSound)
+        || lessonSounds[itemIndex % Math.max(lessonSounds.length, 1)]
+        || lessonSound;
+      return {
+        mode: 'choice',
+        prompt: hearCheckSound
+          ? `Can you hear ${formatHearCheckSound(hearCheckSound)} in ...?`
+          : 'Can you hear the target sound in ...?',
+        options: ['yes', 'no'],
+        correctAnswer: item.answer,
+        audioText: item.word,
+        hearCheckSound,
+      };
+    });
   }
 
   if (type === 'ODD_OUT') {
+    const targetSound = activity.targetSound || lessonSound;
     return [
       {
         mode: 'sound-match',
         prompt: 'Match the pictures to the sound',
         instruction,
-        audioText: lessonSound,
+        audioText: targetSound,
+        soundTarget: targetSound,
         options: dedupeOptions(activity.words || []),
         desiredOptionCount: Math.max(6, activity.words?.length || 0),
       },
@@ -302,18 +311,29 @@ export function buildActivitySteps(activity: any, lessonSound?: string): Step[] 
   }
 
   if ((type === 'REVISION' || type === 'TAP_SOUND') && activity.questions?.length) {
-    return activity.questions.map((q: any, questionIndex: number) => ({
-      mode: 'balloon-choice',
-      instruction,
-      prompt: 'Listen and pop the 3 matching balloons',
-      correctAnswer: q.correctAnswer,
-      audioText: q.audioSound,
-      balloons: buildBalloonOptions(q, questionIndex, q.picture?.word || q.audioWord || ''),
-    }));
+    return activity.questions.flatMap((q: any, questionIndex: number) => {
+      const rawCorrectAnswer = String(q.correctAnswer || q.audioSound || '').toLowerCase();
+      const correctAnswers = rawCorrectAnswer === 'ck' ? ['c', 'k'] : [q.correctAnswer];
+      return correctAnswers.map((correctAnswer, soundIndex) => ({
+        mode: 'balloon-choice' as const,
+        instruction,
+        prompt: 'Listen and pop the 3 matching balloons',
+        correctAnswer,
+        audioText: rawCorrectAnswer === 'ck' ? correctAnswer : q.audioSound,
+        balloons: buildBalloonOptions(
+          { ...q, correctAnswer, audioSound: rawCorrectAnswer === 'ck' ? correctAnswer : q.audioSound },
+          questionIndex * 2 + soundIndex,
+          q.picture?.word || q.audioWord || '',
+        ),
+      }));
+    });
   }
 
   if (type === 'REVISION' && activity.sounds?.length) {
-    return activity.sounds.map((sound: string, questionIndex: number) => ({
+    const separatedSounds = activity.sounds.flatMap((sound: string) => (
+      String(sound).toLowerCase() === 'ck' ? ['c', 'k'] : [sound]
+    ));
+    return separatedSounds.map((sound: string, questionIndex: number) => ({
       mode: 'balloon-choice',
       instruction,
       prompt: 'Listen and pop the 3 matching balloons',
@@ -323,7 +343,7 @@ export function buildActivitySteps(activity: any, lessonSound?: string): Step[] 
         {
           correctAnswer: sound,
           audioSound: sound,
-          options: activity.sounds,
+          options: separatedSounds,
         },
         questionIndex,
       ),
@@ -399,6 +419,11 @@ export default function ActivityLessonScreen({ letter, activities: activityOverr
   const displayText = (value?: string) => {
     const text = String(value || '');
     return preserveLetterCase ? text : text.toLowerCase();
+  };
+  const displayBlendLetter = (tile?: BlendTile | null) => {
+    const text = String(tile?.letter || '');
+    if (!preserveLetterCase) return text.toLowerCase();
+    return tile?.id.startsWith('answer-0-') ? text.toUpperCase() : text.toLowerCase();
   };
   const displayBalloonText = (value?: string) => {
     const text = String(value || '');
@@ -508,13 +533,22 @@ export default function ActivityLessonScreen({ letter, activities: activityOverr
     )),
     [normalizedChoiceOptions],
   );
-  const soundMatchTarget = useMemo(() => {
+  const soundMatchLessonTarget = useMemo(() => {
     const rawTarget = String(letter?.letter || letter?.id || '').trim();
     return rawTarget.toLowerCase().replace(/[^a-z]/g, '') || rawTarget;
   }, [letter?.id, letter?.letter]);
+  const soundMatchTarget = String(currentStep?.soundTarget || soundMatchLessonTarget).toLowerCase();
+  const isSeparatedCkMatch = getInitialSoundCharacters(soundMatchLessonTarget).join('') === 'ck';
+  const soundMatchWordMatches = (word: string) => isSeparatedCkMatch
+    ? getSoundCharacterForWord(word, soundMatchLessonTarget) === soundMatchTarget
+    : wordHasSound(word, soundMatchTarget);
   const soundMatchAnswers = useMemo(
-    () => soundMatchOptions.filter((option) => wordHasSound(option.value, soundMatchTarget)),
-    [soundMatchOptions, soundMatchTarget],
+    () => soundMatchOptions.filter((option) => (
+      isSeparatedCkMatch
+        ? getSoundCharacterForWord(option.value, soundMatchLessonTarget) === soundMatchTarget
+        : wordHasSound(option.value, soundMatchTarget)
+    )),
+    [isSeparatedCkMatch, soundMatchLessonTarget, soundMatchOptions, soundMatchTarget],
   );
 
   useEffect(() => {
@@ -753,7 +787,7 @@ export default function ActivityLessonScreen({ letter, activities: activityOverr
     if (soundMatchLockedRef.current || matchedSoundWordsRef.current.has(word)) return;
     const answeredStepKey = activeStepKey;
 
-    if (!wordHasSound(word, soundMatchTarget)) {
+    if (!soundMatchWordMatches(word)) {
       setFeedback({ type: 'error', text: 'Try another picture! \u{1F4AA}' });
       soundEffects.playError();
       window.setTimeout(() => {
@@ -985,14 +1019,12 @@ export default function ActivityLessonScreen({ letter, activities: activityOverr
                 onClick={() => tile && clearBlendSlot(index)}
                 aria-label={tile ? `Remove ${tile.letter} from position ${index + 1}` : `Empty position ${index + 1}`}
                 className={`grid h-16 w-16 place-items-center rounded-2xl border-4 text-3xl font-black transition md:h-20 md:w-20 md:text-4xl ${
-                  preserveLetterCase ? 'uppercase ' : ''
-                }${
                   tile
                     ? 'cursor-grab border-blue-400 bg-blue-50 text-blue-800 shadow-md active:cursor-grabbing'
                     : 'border-dashed border-slate-300 bg-slate-50 text-slate-300'
                 }`}
               >
-                {displayText(tile?.letter)}
+                {displayBlendLetter(tile)}
               </button>
             ))}
           </div>
@@ -1016,12 +1048,10 @@ export default function ActivityLessonScreen({ letter, activities: activityOverr
                   onClick={() => handleBlendTileTap(tile.id)}
                   aria-label={`Place letter ${tile.letter}`}
                   className={`grid h-14 w-14 place-items-center rounded-xl bg-gradient-to-br from-purple-500 to-indigo-600 text-2xl font-black text-white shadow-lg md:h-16 md:w-16 md:text-3xl ${
-                    preserveLetterCase ? 'uppercase ' : ''
-                  }${
                     isPlaced ? 'pointer-events-none invisible' : 'cursor-grab active:cursor-grabbing'
                   }`}
                 >
-                  {displayText(tile.letter)}
+                  {displayBlendLetter(tile)}
                 </motion.button>
               );
             })}
@@ -1115,7 +1145,7 @@ export default function ActivityLessonScreen({ letter, activities: activityOverr
             <Sparkles aria-hidden="true" className="absolute left-5 top-4 text-yellow-200 drop-shadow-md md:left-8 md:top-7" size={26} />
 
             <span className={`relative z-10 text-7xl font-black tracking-tight text-white drop-shadow-[0_7px_4px_rgba(30,41,59,0.24)] md:text-9xl ${preserveLetterCase ? '' : 'lowercase'}`}>
-              {displayText(letter.letter || soundMatchTarget)}
+              {displayText(soundMatchTarget)}
             </span>
 
             <span className="absolute bottom-1 right-1 z-20 grid h-10 w-10 place-items-center rounded-full bg-gradient-to-br from-white to-blue-50 text-violet-600 shadow-[0_7px_16px_rgba(30,64,175,0.35)] ring-3 ring-white/80 md:bottom-3 md:right-3 md:h-12 md:w-12">
@@ -1202,17 +1232,19 @@ export default function ActivityLessonScreen({ letter, activities: activityOverr
                   }`}
                 >
                   {option.image ? (
-                    <img
-                      src={assetUrl(option.image)}
-                      alt=""
-                      aria-hidden="true"
-                      onError={handleImageError}
-                      loading="eager"
-                      fetchPriority="high"
-                      decoding="async"
-                      draggable={false}
-                      className="h-full w-full select-none object-contain"
-                    />
+                    <span className="absolute inset-3 flex items-center justify-center overflow-hidden">
+                      <img
+                        src={assetUrl(option.image)}
+                        alt=""
+                        aria-hidden="true"
+                        onError={handleImageError}
+                        loading="eager"
+                        fetchPriority="high"
+                        decoding="async"
+                        draggable={false}
+                        className="block h-auto max-h-full w-auto max-w-full select-none object-contain"
+                      />
+                    </span>
                   ) : (
                     <span className="text-5xl md:text-7xl" aria-hidden="true">{option.emoji}</span>
                   )}
@@ -1297,7 +1329,7 @@ export default function ActivityLessonScreen({ letter, activities: activityOverr
         <div
           className={`grid w-full ${
             isHearCheck
-              ? 'max-w-3xl grid-cols-2 gap-4'
+              ? 'max-w-sm grid-cols-1 gap-3 sm:max-w-3xl sm:grid-cols-2 sm:gap-4'
               : isTapSyllable
                 ? 'max-w-2xl grid-cols-2 gap-5 md:gap-8'
                 : 'max-w-4xl grid-cols-1 gap-4 md:grid-cols-2'

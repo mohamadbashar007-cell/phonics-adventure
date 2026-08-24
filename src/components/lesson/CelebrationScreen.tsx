@@ -35,7 +35,7 @@ export default function CelebrationScreen({ letter, stars, onComplete, onExit }:
         transition={{ delay: 0.2 }}
         className="text-xl md:text-2xl text-gray-600 font-bold mb-8"
       >
-        You mastered the letter '{letter.letter}'!
+        You mastered the letter{String(letter.letter || '').toLowerCase() === 'ck' ? "s 'c' and 'k'" : ` '${letter.letter}'`}!
       </motion.p>
 
       <div className="flex gap-4 mb-12">

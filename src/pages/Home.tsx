@@ -214,7 +214,7 @@ export default function Home() {
                           : 'bg-blue-300 text-blue-800'
                       }`}
                     >
-                      {letter.letter}
+                      {String(letter.letter).toLowerCase() === 'ck' ? 'c k' : letter.letter}
                     </span>
                   ))}
                 </div>

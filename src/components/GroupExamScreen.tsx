@@ -9,7 +9,7 @@ import { assetUrl } from '@/utils/assetUrl';
 import { celebrateCorrectAnswer } from '@/utils/correctAnswerCelebration';
 import { formatHearCheckSound, playHearCheckAudio, preloadHearCheckAudio } from '@/utils/hearCheckAudio';
 import FeedbackToast from './lesson/FeedbackToast';
-import { startsWithInitialSoundCharacter, wordHasSound } from '@/utils/initialSound';
+import { getInitialSoundCharacters, getSoundCharacterForWord, startsWithInitialSoundCharacter, wordHasSound } from '@/utils/initialSound';
 
 interface GroupExamScreenProps {
   groupId: number;
@@ -64,18 +64,28 @@ function shuffleQuestionOptions(options: ExamOption[], correctValue: string) {
   return { options: shuffled, correctOptionIndex: shuffled.findIndex((option) => option.value === correctValue) };
 }
 
-function letterOptions(group: any, currentLetter: any, offset: number) {
-  const letters = group.letters || [];
-  const currentIndex = letters.findIndex((letter: any) => letter.id === currentLetter.id);
-  const candidates = [
-    currentLetter,
-    letters[(currentIndex + 1 + offset) % letters.length],
-    letters[(currentIndex + 2 + offset) % letters.length],
-  ];
-  return uniqueByValue(candidates.map((letter: any) => ({
-    value: letter.id,
-    label: letter.letter,
-  }))).slice(0, 3);
+function examLetterOptionValue(letter: any, sound: string) {
+  const units = getInitialSoundCharacters(letter.letter || letter.id);
+  return units.length > 1 ? `${letter.id}:${sound}` : letter.id;
+}
+
+function letterOptions(group: any, currentLetter: any, offset: number, currentSound?: string) {
+  const currentUnits = getInitialSoundCharacters(currentLetter.letter || currentLetter.id);
+  const targetSound = currentSound || currentUnits[0] || currentLetter.letter || currentLetter.id;
+  const correct = {
+    value: examLetterOptionValue(currentLetter, targetSound),
+    label: targetSound,
+  };
+  const distractors = (group.letters || [])
+    .filter((letter: any) => letter.id !== currentLetter.id)
+    .flatMap((letter: any) => getInitialSoundCharacters(letter.letter || letter.id).map((sound) => ({
+      value: examLetterOptionValue(letter, sound),
+      label: sound,
+    })));
+  const rotatedDistractors = distractors.length
+    ? [...distractors.slice(offset % distractors.length), ...distractors.slice(0, offset % distractors.length)]
+    : [];
+  return uniqueByValue([correct, ...rotatedDistractors]).slice(0, 3);
 }
 
 function makeListenImageQuestion(letter: any, index: number): ExamQuestion | null {
@@ -99,12 +109,15 @@ function makeListenImageQuestion(letter: any, index: number): ExamQuestion | nul
 
 function makePictureLetterQuestion(group: any, letter: any, index: number): ExamQuestion | null {
   const lessonSound = letter.letter || letter.id;
-  const item = (letter.vocabulary || []).find(
+  const matchingItems = (letter.vocabulary || []).filter(
     (option: any) => wordHasSound(option.word, lessonSound),
   );
+  const item = matchingItems[index % Math.max(1, matchingItems.length)];
   if (!item?.image) return null;
 
-  const prepared = shuffleQuestionOptions(letterOptions(group, letter, index), letter.id);
+  const targetSound = getSoundCharacterForWord(item.word, lessonSound);
+  const correctValue = examLetterOptionValue(letter, targetSound);
+  const prepared = shuffleQuestionOptions(letterOptions(group, letter, index, targetSound), correctValue);
   return {
     id: `${letter.id}-picture-letter-${index}`,
     type: 'picture-letter',
@@ -130,6 +143,10 @@ function makeHearCheckQuestion(letter: any, index: number): ExamQuestion | null 
   const item = candidates[index % candidates.length];
   if (!item) return null;
 
+  const soundUnits = getInitialSoundCharacters(target);
+  const targetSound = getSoundCharacterForWord(item, target)
+    || soundUnits[index % Math.max(1, soundUnits.length)]
+    || target;
   const correctValue = matchesLessonSound(item) ? 'yes' : 'no';
   const prepared = shuffleQuestionOptions([
     { value: 'yes', label: 'Yes', tone: 'yes' },
@@ -138,22 +155,26 @@ function makeHearCheckQuestion(letter: any, index: number): ExamQuestion | null 
   return {
     id: `${letter.id}-hear-${index}`,
     type: 'hear-check',
-    prompt: `Can you hear ${formatHearCheckSound(target)} in ...?`,
+    prompt: `Can you hear ${formatHearCheckSound(targetSound)} in ...?`,
     audioText: item,
-    hearCheckSound: target,
+    hearCheckSound: targetSound,
     ...prepared,
   };
 }
 
 function makeSoundLetterQuestion(group: any, letter: any, index: number): ExamQuestion | null {
-  const options = letterOptions(group, letter, index + 1);
+  const lessonSound = letter.letter || letter.id;
+  const soundUnits = getInitialSoundCharacters(lessonSound);
+  const targetSound = soundUnits[index % Math.max(1, soundUnits.length)] || lessonSound;
+  const correctValue = examLetterOptionValue(letter, targetSound);
+  const options = letterOptions(group, letter, index + 1, targetSound);
   if (options.length < 2) return null;
-  const prepared = shuffleQuestionOptions(options, letter.id);
+  const prepared = shuffleQuestionOptions(options, correctValue);
   return {
     id: `${letter.id}-sound-letter-${index}`,
     type: 'sound-letter',
     prompt: 'Listen and tap the matching sound',
-    audioText: letter.letter || letter.id,
+    audioText: targetSound,
     ...prepared,
   };
 }

@@ -2150,7 +2150,8 @@
                     "i",
                     "p",
                     "n",
-                    "ck"
+                    "c",
+                    "k"
                   ],
                   "correctAnswer": "s"
                 },
@@ -2163,7 +2164,8 @@
                     "i",
                     "p",
                     "n",
-                    "ck"
+                    "c",
+                    "k"
                   ],
                   "correctAnswer": "a"
                 },
@@ -2176,7 +2178,8 @@
                     "i",
                     "p",
                     "n",
-                    "ck"
+                    "c",
+                    "k"
                   ],
                   "correctAnswer": "t"
                 },
@@ -2189,7 +2192,8 @@
                     "i",
                     "p",
                     "n",
-                    "ck"
+                    "c",
+                    "k"
                   ],
                   "correctAnswer": "i"
                 }
@@ -2212,13 +2216,13 @@
                   "result": "cat"
                 },
                 {
-                  "left": "sa",
-                  "right": "ck",
+                  "left": "sac",
+                  "right": "k",
                   "result": "sack"
                 },
                 {
-                  "left": "pa",
-                  "right": "ck",
+                  "left": "pac",
+                  "right": "k",
                   "result": "pack"
                 }
               ]
@@ -2247,7 +2251,7 @@
                   "correctAnswer": "cat"
                 },
                 {
-                  "prompt": "Sound is ck",
+                  "prompt": "Sound is k",
                   "options": [
                     {
                       "word": "kick",
@@ -2285,25 +2289,29 @@
             {
               "number": 4,
               "type": "HEAR_CHECK",
-              "instruction": "Can you hear ck in the word?",
+              "instruction": "Can you hear the letter sound in the word?",
               "items": [
                 {
                   "word": "kick",
+                  "sound": "k",
                   "answer": "yes",
                   "isCorrect": true
                 },
                 {
                   "word": "cat",
+                  "sound": "c",
                   "answer": "yes",
                   "isCorrect": true
                 },
                 {
                   "word": "ant",
+                  "sound": "c",
                   "answer": "no",
                   "isCorrect": false
                 },
                 {
                   "word": "sun",
+                  "sound": "k",
                   "answer": "no",
                   "isCorrect": false
                 }
@@ -2393,12 +2401,14 @@
                   "audioWord": "sack",
                   "availableSounds": [
                     "sa",
-                    "ck",
+                    "c",
+                    "k",
                     "ca"
                   ],
                   "correctOrder": [
                     "sa",
-                    "ck"
+                    "c",
+                    "k"
                   ]
                 }
               ]
@@ -4394,12 +4404,12 @@
           },
           "vocabulary": [
             {
-              "word": "egg",
-              "image": "/images/vocabulary/egg.webp"
-            },
-            {
               "word": "grass",
               "image": "/images/vocabulary/grass.webp"
+            },
+            {
+              "word": "egg",
+              "image": "/images/vocabulary/egg.webp"
             },
             {
               "word": "tag",

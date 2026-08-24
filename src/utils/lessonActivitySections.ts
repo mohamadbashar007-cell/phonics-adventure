@@ -1,4 +1,4 @@
-import { getInitialSoundCharacters, startsWithInitialSoundCharacter, wordHasSound } from './initialSound';
+import { getInitialSoundCharacters, getSoundCharacterForWord, startsWithInitialSoundCharacter, wordHasSound } from './initialSound';
 
 export const MAX_QUESTIONS_PER_TYPE = 3;
 
@@ -141,9 +141,13 @@ function makeHearActivity(letter: any, words: Array<{ word?: string }>) {
   return {
     type: 'HEAR_CHECK',
     instruction: 'Listen and decide whether the word has the target sound',
-    items: ordered.map((word) => {
+    items: ordered.map((word, index) => {
       const isCorrect = wordHasSound(word, target);
-      return { word, answer: isCorrect ? 'yes' : 'no', isCorrect };
+      const sounds = getInitialSoundCharacters(target);
+      const sound = isCorrect
+        ? getSoundCharacterForWord(word, target)
+        : sounds[index % Math.max(sounds.length, 1)];
+      return { word, sound, answer: isCorrect ? 'yes' : 'no', isCorrect };
     }),
   };
 }
@@ -177,15 +181,45 @@ function makeMatchActivity(
   words: Array<{ word?: string; image?: string }>,
   vocabulary: Array<{ word?: string; image?: string }> = [],
 ) {
-  const target = letter?.letter || letter?.id;
+  const lessonSound = letter?.letter || letter?.id;
+
+  // The legacy ck lesson is now taught as separate c and k letters. Keep its
+  // c matching screen focused on c, exclude "kick", and provide six explicit
+  // image-backed choices so the generic option filler cannot add a word whose
+  // image file does not exist (such as pan or sat).
+  if (String(letter?.id || '').toLowerCase() === 'ck') {
+    return {
+      type: 'ODD_OUT',
+      instruction: 'Drag or tap the pictures that have the target sound',
+      targetSound: 'c',
+      words: [
+        { word: 'cap', image: '/images/vocabulary/cap.webp' },
+        { word: 'cat', image: '/images/vocabulary/cat.webp' },
+        { word: 'egg', image: '/images/vocabulary/egg.webp' },
+        { word: 'hat', image: '/images/vocabulary/hat.webp' },
+        { word: 'ant', image: '/images/vocabulary/ant.webp' },
+        { word: 'sun', image: '/images/vocabulary/sun.webp' },
+      ],
+    };
+  }
+
   const pictureWords = dedupeWords([...vocabulary, ...words]).filter((item) => item.word && item.image);
-  const matching = pictureWords.filter((item) => wordHasSound(item.word, target));
-  const distractors = pictureWords.filter((item) => !wordHasSound(item.word, target));
+  const firstMatchingWord = pictureWords.find((item) => wordHasSound(item.word, lessonSound));
+  const targetSound = getSoundCharacterForWord(firstMatchingWord?.word, lessonSound)
+    || getInitialSoundCharacters(lessonSound)[0]
+    || lessonSound;
+  const matching = pictureWords.filter((item) => (
+    getSoundCharacterForWord(item.word, lessonSound) === targetSound
+  ));
+  const distractors = pictureWords.filter((item) => (
+    getSoundCharacterForWord(item.word, lessonSound) !== targetSound
+  ));
   const selected = dedupeWords([...matching.slice(0, 3), ...distractors.slice(0, 3)]);
 
   return {
     type: 'ODD_OUT',
     instruction: 'Drag or tap the pictures that have the target sound',
+    targetSound,
     words: selected,
   };
 }

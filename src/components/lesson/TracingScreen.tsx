@@ -79,9 +79,7 @@ export default function TracingScreen({ letter, traceLetters: traceLettersProp, 
   const activeTraceLabel = activeTraceLetter.length === 2 && /[A-Z][a-z]/.test(activeTraceLetter)
     ? `${activeTraceLetter[0]} ${activeTraceLetter[1]}`
     : activeTraceLetter;
-  const activeTraceSound = String(letter.id || '').toLowerCase() === 'ck'
-    ? 'ck'
-    : /^[A-Z][a-z]$/.test(activeTraceLetter)
+  const activeTraceSound = /^[A-Z][a-z]$/.test(activeTraceLetter)
       ? activeTraceLetter[0].toLowerCase()
       : activeTraceLetter.toLowerCase();
   const traceInstruction = activeTraceLetter.length > 1

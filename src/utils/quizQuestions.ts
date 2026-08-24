@@ -1,5 +1,5 @@
 import curriculum from '../data/curriculum.json';
-import { startsWithInitialSoundCharacter, wordHasSound } from './initialSound';
+import { getSoundCharacterForWord, startsWithInitialSoundCharacter, wordHasSound } from './initialSound';
 
 type PictureWordOption = {
   word: string;
@@ -63,7 +63,7 @@ export function buildQuizQuestions(letter: any, exercise: any, exerciseNumber: n
         (word: string) => wordHasSound(word, target),
       );
       return [{
-        target,
+        target: getSoundCharacterForWord(correctVocabularyWord.word, target),
         options: [{ ...correctVocabularyWord, isCorrect: true }, ...distractors].slice(0, 3),
       }];
     }

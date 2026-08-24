@@ -148,6 +148,9 @@ export default function LessonIsland({
   onFocus,
   onTouchStart,
 }: LessonIslandProps) {
+  const displayLetter = String(letter).toLowerCase() === 'ck'
+    ? 'c k'
+    : preserveLetterCase ? letter : letter.toLowerCase();
   const islandState = locked ? 'locked' : completed ? 'completed' : current ? 'current' : 'open';
   const flagFill = locked ? '#7D858E' : completed ? '#176DD3' : '#1C78DE';
   const flagStroke = locked ? '#565E68' : '#0A4DAA';
@@ -161,7 +164,7 @@ export default function LessonIsland({
   return (
     <motion.button
       type="button"
-      aria-label={`${locked ? 'Locked' : 'Start'} lesson ${lessonNumber}: ${letter}`}
+      aria-label={`${locked ? 'Locked' : 'Start'} lesson ${lessonNumber}: ${displayLetter}`}
       disabled={locked}
       onClick={onClick}
       onMouseEnter={onMouseEnter}
@@ -236,7 +239,7 @@ export default function LessonIsland({
             </g>
           ) : (
               <text x="205" y="104" textAnchor="middle" dominantBaseline="middle" fill="white" fontSize={letter.length > 1 ? 62 : 82} fontWeight="900" fontFamily="'Phonics Comic Sans', 'Comic Sans MS', sans-serif">
-              {preserveLetterCase ? letter : letter.toLowerCase()}
+              {displayLetter}
             </text>
           )}
         </g>

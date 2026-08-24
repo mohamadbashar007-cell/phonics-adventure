@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { motion, useReducedMotion } from 'framer-motion';
+import { motion, type PanInfo, useReducedMotion } from 'framer-motion';
 import { ArrowRight, CheckCircle2, Sparkles, Star, Volume2 } from 'lucide-react';
 import { audioService } from '../../services/audioService';
 import { soundEffects } from '../../services/soundEffects';
@@ -18,6 +18,19 @@ const WAGON_THEMES = [
   { shell: 'from-sky-400 via-blue-500 to-indigo-600', rim: 'border-blue-800', glow: 'shadow-blue-500/30' },
   { shell: 'from-violet-500 via-purple-500 to-fuchsia-600', rim: 'border-purple-900', glow: 'shadow-purple-500/30' },
 ];
+
+function shuffleLetters(letters: string[]) {
+  const shuffled = [...letters];
+  for (let index = shuffled.length - 1; index > 0; index -= 1) {
+    const swapIndex = Math.floor(Math.random() * (index + 1));
+    [shuffled[index], shuffled[swapIndex]] = [shuffled[swapIndex], shuffled[index]];
+  }
+
+  if (shuffled.length > 1 && shuffled.every((item, index) => item === letters[index])) {
+    return [...shuffled.slice(1), shuffled[0]];
+  }
+  return shuffled;
+}
 
 function Wheel({ className = '' }: { className?: string }) {
   return (
@@ -75,66 +88,87 @@ function Locomotive({ reducedMotion }: { reducedMotion: boolean }) {
 export default function AlphabetTrainScreen({ letter, onComplete }: AlphabetTrainScreenProps) {
   const prefersReducedMotion = Boolean(useReducedMotion());
   const viewportRef = useRef<HTMLDivElement>(null);
-  const [canContinue, setCanContinue] = useState(false);
-  const [visibleWagonCount, setVisibleWagonCount] = useState(0);
+  const dropZoneRef = useRef<HTMLDivElement>(null);
+  const draggedLetterRef = useRef('');
   const lessonLetters = useMemo(() => String(letter?.letter || '').match(/[A-Z]/g) || [], [letter?.letter]);
+  const lessonKey = lessonLetters.join('');
+  const [shuffledLessonLetters, setShuffledLessonLetters] = useState(() => shuffleLetters(lessonLetters));
+  const [placedLetters, setPlacedLetters] = useState<string[]>([]);
+  const [feedback, setFeedback] = useState('');
   const accumulatedLetters = useMemo(() => {
     const lastLetter = lessonLetters.at(-1);
     const lastIndex = lastLetter ? ALPHABET.indexOf(lastLetter) : -1;
     return lastIndex >= 0 ? ALPHABET.slice(0, lastIndex + 1).split('') : lessonLetters;
   }, [lessonLetters]);
   const newLetters = useMemo(() => new Set(lessonLetters), [lessonLetters]);
-  const isCompleteAlphabet = accumulatedLetters.length === ALPHABET.length;
-  const progress = Math.round((accumulatedLetters.length / ALPHABET.length) * 100);
+  const previouslyLearnedLetters = useMemo(
+    () => accumulatedLetters.filter((capital) => !newLetters.has(capital)),
+    [accumulatedLetters, newLetters],
+  );
+  const aboardLetters = useMemo(
+    () => [...previouslyLearnedLetters, ...placedLetters],
+    [placedLetters, previouslyLearnedLetters],
+  );
+  const remainingLetters = shuffledLessonLetters.filter((capital) => !placedLetters.includes(capital));
+  const nextLetter = lessonLetters[placedLetters.length];
+  const canContinue = lessonLetters.length > 0 && placedLetters.length === lessonLetters.length;
+  const isCompleteAlphabet = canContinue && aboardLetters.length === ALPHABET.length;
+  const progress = Math.round((aboardLetters.length / ALPHABET.length) * 100);
 
   useEffect(() => {
-    setCanContinue(false);
-    setVisibleWagonCount(prefersReducedMotion ? accumulatedLetters.length : 0);
-    let cancelled = false;
-    const wait = (delay: number) => new Promise<void>((resolve) => window.setTimeout(resolve, delay));
-    const announceWagons = async () => {
-      for (const capital of accumulatedLetters) {
-        if (cancelled) return;
-        await audioService.playAudioFile(getAlphabetTrainLetterAudioPath(capital));
-        if (cancelled) return;
-        await wait(60);
-      }
-    };
-    const buildTrain = async () => {
-      if (prefersReducedMotion) {
-        void announceWagons();
-        setCanContinue(true);
-        return;
-      }
+    setShuffledLessonLetters(shuffleLetters(lessonLetters));
+    setPlacedLetters([]);
+    setFeedback('');
+    lessonLetters.forEach((capital) => {
+      audioService.preloadAudioFile(getAlphabetTrainLetterAudioPath(capital), { priority: true });
+    });
 
-      await wait(220);
-      // The train keeps moving while the letters are spoken in sequence, so a
-      // longer recording never makes the wagon animation feel stuck.
-      void announceWagons();
-      for (let index = 0; index < accumulatedLetters.length; index += 1) {
-        if (cancelled) return;
-        setVisibleWagonCount(index + 1);
-        await wait(380);
-      }
-      if (!cancelled) setCanContinue(true);
-    };
-    void buildTrain();
+    return () => audioService.stop();
+    // lessonKey represents the complete stable letter set for this train task.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lessonKey]);
 
+  useEffect(() => {
     const scrollTimeout = window.setTimeout(() => {
       const viewport = viewportRef.current;
       if (viewport) viewport.scrollTo({ left: viewport.scrollWidth, behavior: prefersReducedMotion ? 'auto' : 'smooth' });
-    }, prefersReducedMotion ? 100 : Math.min(8_000, 500 + accumulatedLetters.length * 410));
+    }, prefersReducedMotion ? 40 : 180);
 
-    return () => {
-      cancelled = true;
-      audioService.stop();
-      window.clearTimeout(scrollTimeout);
-    };
-  }, [accumulatedLetters, prefersReducedMotion]);
+    return () => window.clearTimeout(scrollTimeout);
+  }, [aboardLetters.length, prefersReducedMotion]);
 
-  const playLetterPair = (capital: string) => {
+  const playLetterName = (capital: string) => {
     soundEffects.playClick();
     void audioService.playAudioFile(getAlphabetTrainLetterAudioPath(capital));
+  };
+
+  const placeLetter = (capital: string) => {
+    if (!nextLetter || placedLetters.includes(capital)) return;
+    if (capital !== nextLetter) {
+      void soundEffects.playError();
+      setFeedback(`Find ${nextLetter}${nextLetter.toLowerCase()} first`);
+      window.setTimeout(() => setFeedback(''), 900);
+      return;
+    }
+
+    void soundEffects.playSuccess();
+    setPlacedLetters((current) => [...current, capital]);
+    setFeedback(`${capital}${capital.toLowerCase()} is aboard!`);
+    window.setTimeout(() => setFeedback(''), 900);
+  };
+
+  const handleLetterDrop = (capital: string, info: PanInfo) => {
+    const dropRect = dropZoneRef.current?.getBoundingClientRect();
+    const landedOnTrain = Boolean(dropRect)
+      && info.point.x >= dropRect!.left
+      && info.point.x <= dropRect!.right
+      && info.point.y >= dropRect!.top
+      && info.point.y <= dropRect!.bottom;
+
+    if (landedOnTrain) placeLetter(capital);
+    window.setTimeout(() => {
+      if (draggedLetterRef.current === capital) draggedLetterRef.current = '';
+    }, 0);
   };
 
   const finish = () => {
@@ -183,7 +217,7 @@ export default function AlphabetTrainScreen({ letter, onComplete }: AlphabetTrai
 
           <div className="w-full min-w-0 rounded-2xl border border-white/15 bg-slate-950/35 p-3 text-left shadow-inner md:min-w-[230px]">
             <div className="mb-2 flex items-center justify-between text-xs font-black uppercase tracking-wider text-sky-100">
-              <span>{accumulatedLetters.length} of 26 aboard</span>
+              <span>{aboardLetters.length} of 26 aboard</span>
               <span className="text-amber-300">{progress}%</span>
             </div>
             <div className="h-3 overflow-hidden rounded-full border border-white/10 bg-slate-950/70 p-0.5">
@@ -198,20 +232,56 @@ export default function AlphabetTrainScreen({ letter, onComplete }: AlphabetTrai
         </motion.header>
 
         <section className="relative mt-3 flex h-[21rem] flex-none flex-col justify-end overflow-hidden rounded-3xl border border-white/15 bg-gradient-to-b from-sky-300/10 via-transparent to-emerald-950/50 shadow-[0_28px_80px_rgba(0,0,0,.38)] backdrop-blur-[2px] md:mt-5 md:min-h-[330px] md:flex-1 md:rounded-[2.25rem]">
-          <div className="pointer-events-none absolute left-5 top-5 rounded-xl border border-white/20 bg-slate-950/45 px-4 py-2 text-left shadow-xl backdrop-blur-md">
+          <div className="pointer-events-none absolute left-5 top-5 hidden rounded-xl border border-white/20 bg-slate-950/45 px-4 py-2 text-left shadow-xl backdrop-blur-md sm:block">
             <p className="text-[10px] font-black uppercase tracking-[0.26em] text-cyan-200">Next stop</p>
-            <p className="text-lg font-black text-white">Letter {accumulatedLetters.at(-1)}</p>
+            <p className="text-lg font-black text-white">{nextLetter ? `Letter ${nextLetter}` : 'All aboard!'}</p>
           </div>
 
-          <div ref={viewportRef} className="relative z-10 w-full overflow-hidden px-2 pb-8 pt-16 md:overflow-x-auto md:px-9 md:pb-12 md:pt-24 [scrollbar-color:#38bdf8_rgba(15,23,42,.35)] [scrollbar-width:thin]">
+          <div className="absolute inset-x-2 top-3 z-30 flex flex-col items-center gap-2 sm:inset-x-36 md:top-4">
+            <p className="rounded-full bg-slate-950/45 px-4 py-1 text-xs font-black text-cyan-100 shadow-md backdrop-blur-sm md:text-sm">
+              Drag the letters to the train in order
+            </p>
+            <div className="flex min-h-16 items-center justify-center gap-2 md:min-h-20 md:gap-4">
+              {remainingLetters.map((capital, index) => (
+                <motion.button
+                  key={capital}
+                  type="button"
+                  drag
+                  dragSnapToOrigin
+                  dragMomentum={false}
+                  dragElastic={0.12}
+                  onPointerDown={() => playLetterName(capital)}
+                  onDragStart={() => {
+                    draggedLetterRef.current = capital;
+                  }}
+                  onDragEnd={(_, info) => handleLetterDrop(capital, info)}
+                  onClick={() => {
+                    if (draggedLetterRef.current === capital) return;
+                    placeLetter(capital);
+                  }}
+                  whileHover={{ y: -4, scale: 1.06 }}
+                  whileTap={{ scale: 0.96 }}
+                  aria-label={`Letter ${capital}. Drag it to the train`}
+                  className={`relative z-40 grid h-14 w-16 cursor-grab place-items-center rounded-2xl border-4 border-white bg-gradient-to-br text-2xl font-black text-white shadow-xl active:cursor-grabbing md:h-18 md:w-20 md:text-3xl ${
+                    WAGON_THEMES[index % WAGON_THEMES.length].shell
+                  }`}
+                >
+                  <span>{capital}<span className="text-[0.72em]">{capital.toLowerCase()}</span></span>
+                  <Volume2 className="absolute bottom-0.5 right-0.5 rounded-full bg-slate-950/35 p-0.5" size={16} />
+                </motion.button>
+              ))}
+            </div>
+          </div>
+
+          <div ref={viewportRef} className="relative z-10 w-full touch-pan-x overflow-x-auto overflow-y-hidden overscroll-x-contain px-2 pb-8 pt-28 md:px-9 md:pb-12 md:pt-32 [scrollbar-color:#38bdf8_rgba(15,23,42,.35)] [scrollbar-width:thin]">
             <motion.div
               initial={false}
               animate={{ opacity: 1 }}
-              className="flex w-max min-w-full origin-bottom-left scale-[0.46] items-end md:scale-100"
+              className="flex w-max items-end [zoom:0.46] md:min-w-full md:[zoom:1]"
             >
               <Locomotive reducedMotion={prefersReducedMotion} />
 
-              {accumulatedLetters.slice(0, visibleWagonCount).map((capital, index) => {
+              {aboardLetters.map((capital, index) => {
                 const theme = WAGON_THEMES[index % WAGON_THEMES.length];
                 const isNew = newLetters.has(capital);
                 return (
@@ -229,7 +299,7 @@ export default function AlphabetTrainScreen({ letter, onComplete }: AlphabetTrai
                     <span className="mb-12 h-3 w-6 border-y-2 border-slate-950 bg-amber-300" aria-hidden="true" />
                     <motion.button
                       type="button"
-                      onClick={() => playLetterPair(capital)}
+                      onClick={() => playLetterName(capital)}
                       whileHover={{ y: -8, scale: 1.04 }}
                       whileTap={{ scale: 0.96 }}
                       aria-label={`Play ${capital} and ${capital.toLowerCase()}`}
@@ -258,6 +328,26 @@ export default function AlphabetTrainScreen({ letter, onComplete }: AlphabetTrai
                   </motion.div>
                 );
               })}
+
+              {!canContinue && (
+                <div className="relative flex items-end">
+                  <span className="mb-12 h-3 w-6 border-y-2 border-slate-950 bg-amber-300" aria-hidden="true" />
+                  <div
+                    ref={dropZoneRef}
+                    className="relative grid h-32 w-29 shrink-0 place-items-center rounded-[1.65rem] border-[6px] border-dashed border-cyan-200 bg-cyan-300/15 text-white shadow-[0_0_30px_rgba(34,211,238,.38)] backdrop-blur-sm"
+                    aria-label={`Drop letter ${nextLetter || ''} here`}
+                  >
+                    <motion.span
+                      animate={prefersReducedMotion ? undefined : { scale: [1, 1.12, 1], opacity: [0.65, 1, 0.65] }}
+                      transition={{ duration: 1.2, repeat: Infinity }}
+                      className="text-5xl font-black text-cyan-100"
+                    >
+                      ?
+                    </motion.span>
+                    <span className="absolute bottom-3 text-[9px] font-black uppercase tracking-widest text-cyan-100">drop here</span>
+                  </div>
+                </div>
+              )}
             </motion.div>
           </div>
 
@@ -288,7 +378,7 @@ export default function AlphabetTrainScreen({ letter, onComplete }: AlphabetTrai
           ) : (
             <div className="flex items-center gap-3 rounded-full border border-white/10 bg-white/5 px-5 py-2 text-sm font-bold text-sky-100/75">
               <motion.span animate={{ opacity: [0.35, 1, 0.35] }} transition={{ duration: 1.2, repeat: Infinity }} className="h-2.5 w-2.5 rounded-full bg-cyan-300" />
-              All aboard… building your alphabet train
+              {feedback || (nextLetter ? `Drag ${nextLetter}${nextLetter.toLowerCase()} onto the empty wagon` : 'Arrange the letters')}
             </div>
           )}
         </div>

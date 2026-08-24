@@ -1,3 +1,5 @@
+import { getSoundCharacterForWord } from './initialSound';
+
 export type BalloonOption = {
   id: string;
   label: string;
@@ -30,11 +32,15 @@ function shuffleItems<T>(items: T[]) {
 }
 
 export function buildBalloonOptions(question: any, questionIndex: number, pictureWord = ''): BalloonOption[] {
-  const correctAnswer = String(question?.correctAnswer || question?.audioSound || '').trim();
+  const rawCorrectAnswer = String(question?.correctAnswer || question?.audioSound || '').trim();
+  const correctAnswer = rawCorrectAnswer.toLowerCase() === 'ck'
+    ? getSoundCharacterForWord(pictureWord, 'ck') || 'c'
+    : rawCorrectAnswer;
   const correctKey = correctAnswer.toLowerCase();
   const suppliedDistractors = (question?.options || [])
     .map((option: BalloonSourceOption) => typeof option === 'string' ? option : option.word || option.label || '')
     .map((option: string) => option.trim())
+    .flatMap((option: string) => option.toLowerCase() === 'ck' ? ['c', 'k'] : [option])
     .filter((option: string) => option && option.toLowerCase() !== correctKey);
   const distractors = Array.from(new Set(
     [...suppliedDistractors, ...BALLOON_DISTRACTORS]

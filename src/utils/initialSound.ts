@@ -11,8 +11,25 @@ export function getInitialSoundCharacters(sound: unknown): string[] {
     .trim()
     .split(/[\s,/]+/)
     .map(normalizeSound)
-    .filter(Boolean);
+    .filter(Boolean)
+    .flatMap((unit) => unit === 'ck' ? ['c', 'k'] : [unit]);
   return Array.from(new Set(units));
+}
+
+export function getSoundCharacterForWord(word: unknown, sound: unknown): string {
+  const normalizedWord = normalizeWord(word);
+  const units = getInitialSoundCharacters(sound);
+  const isSeparatedCkLesson = units.includes('c') && units.includes('k');
+
+  if (isSeparatedCkLesson) {
+    if (normalizedWord.startsWith('k')) return 'k';
+    if (normalizedWord.startsWith('c')) return 'c';
+    if (normalizedWord.includes('k')) return 'k';
+    if (normalizedWord.includes('c')) return 'c';
+    return '';
+  }
+
+  return units.find((unit) => normalizedWord.includes(unit)) || units[0] || '';
 }
 
 export function startsWithInitialSoundCharacter(word: unknown, sound: unknown): boolean {

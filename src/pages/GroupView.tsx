@@ -490,7 +490,7 @@ export default function GroupView() {
                 >
                   <button
                     type="button"
-                    aria-label={`${node.isLocked ? 'Locked' : 'Start'} lesson ${node.index + 1}: ${node.letter.letter}`}
+                    aria-label={`${node.isLocked ? 'Locked' : 'Start'} lesson ${node.index + 1}: ${String(node.letter.letter).toLowerCase() === 'ck' ? 'c k' : node.letter.letter}`}
                     onClick={() => (node.isLocked ? handleLockedLessonClick(node.index + 1) : handleLetterClick(node.letter))}
                     onMouseEnter={() => !node.isLocked && handleLetterWarmup(node.letter)}
                     onFocus={() => !node.isLocked && handleLetterWarmup(node.letter)}

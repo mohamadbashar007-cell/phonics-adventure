@@ -76,7 +76,7 @@ export default function LessonEngine({ groupId, letter, onComplete, onExit }: Le
     () => activitySections
       .filter((section) => (
         (isCapitalGroup
-          ? section.key !== 'tap'
+          ? section.key !== 'tap' && section.key !== 'hear'
           : section.key !== 'segment')
         && !(omitsEarlyGroupOneBlend && section.key === 'blend')
       ))
@@ -187,7 +187,8 @@ export default function LessonEngine({ groupId, letter, onComplete, onExit }: Le
     });
     const totalStars = stars + earnedStars;
     setStars(totalStars);
-    setCurrentScreen('hear');
+    const firstActivitySection = visibleActivitySections[0];
+    setCurrentScreen(firstActivitySection?.key || (isCapitalGroup ? 'train' : 'celebration'));
   };
 
   const handleActivitySectionComplete = (sectionKey: ActivitySectionKey, earnedStars: number) => {
@@ -267,7 +268,7 @@ export default function LessonEngine({ groupId, letter, onComplete, onExit }: Le
       </div>
 
         <div className="relative z-0 min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain">
-        <AnimatePresence mode="wait">
+        <AnimatePresence mode="popLayout">
           <motion.div
             key={currentScreen}
             variants={screenVariants}

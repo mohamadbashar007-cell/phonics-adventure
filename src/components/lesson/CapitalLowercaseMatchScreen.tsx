@@ -4,6 +4,7 @@ import { ArrowRight, Link2 } from 'lucide-react';
 import { audioService } from '../../services/audioService';
 import { soundEffects } from '../../services/soundEffects';
 import { celebrateCorrectAnswer } from '../../utils/correctAnswerCelebration';
+import { getAlphabetTrainLetterAudioPath } from '../../utils/audioPaths';
 import FeedbackToast from './FeedbackToast';
 
 interface CapitalLowercaseMatchScreenProps {
@@ -32,18 +33,22 @@ export default function CapitalLowercaseMatchScreen({ letter, onComplete }: Capi
   );
   const [lowercaseOrder, setLowercaseOrder] = useState<string[]>(() => shuffle(capitals.map((item) => item.toLowerCase())));
   const [capitalOrder, setCapitalOrder] = useState<string[]>(() => shuffle(capitals));
+  const [selectedCapital, setSelectedCapital] = useState('');
   const [selectedLowercase, setSelectedLowercase] = useState('');
   const [matchedCapitals, setMatchedCapitals] = useState<string[]>([]);
   const [wrongCapital, setWrongCapital] = useState('');
+  const [wrongLowercase, setWrongLowercase] = useState('');
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const wrongTimeoutRef = useRef<number | null>(null);
 
   useEffect(() => {
     setLowercaseOrder(shuffle(capitals.map((item) => item.toLowerCase())));
     setCapitalOrder(shuffle(capitals));
+    setSelectedCapital('');
     setSelectedLowercase('');
     setMatchedCapitals([]);
     setWrongCapital('');
+    setWrongLowercase('');
     setFeedback(null);
     void audioService.playPrompt('Match each capital letter with its small letter');
   }, [capitals, letter?.id]);
@@ -55,25 +60,18 @@ export default function CapitalLowercaseMatchScreen({ letter, onComplete }: Capi
   const isComplete = capitals.length > 0 && matchedCapitals.length === capitals.length;
   const rowPosition = (index: number, total: number) => ((index + 0.5) / Math.max(total, 1)) * 100;
 
-  const chooseLowercase = (lowercase: string) => {
-    if (matchedCapitals.includes(lowercase.toUpperCase()) || isComplete) return;
-    soundEffects.playClick();
-    setSelectedLowercase(lowercase);
-    setFeedback(null);
-    void audioService.playPrompt(lowercase);
+  const playLetterName = (value: string) => {
+    void audioService.playAudioFile(getAlphabetTrainLetterAudioPath(value));
   };
 
-  const chooseCapital = (capital: string) => {
-    if (!selectedLowercase || matchedCapitals.includes(capital) || isComplete) return;
-    soundEffects.playClick();
-
-    if (capital.toLowerCase() === selectedLowercase) {
+  const matchPair = (capital: string, lowercase: string) => {
+    if (capital.toLowerCase() === lowercase) {
       const nextMatches = [...matchedCapitals, capital];
       setMatchedCapitals(nextMatches);
+      setSelectedCapital('');
       setSelectedLowercase('');
       setFeedback({ type: 'success', text: `${capital} matches ${capital.toLowerCase()}!` });
       soundEffects.playSuccess();
-      void audioService.playPrompt(`${capital} and ${capital.toLowerCase()}`);
       if (nextMatches.length === capitals.length) {
         soundEffects.playCelebration();
         celebrateCorrectAnswer();
@@ -82,13 +80,33 @@ export default function CapitalLowercaseMatchScreen({ letter, onComplete }: Capi
     }
 
     setWrongCapital(capital);
-    setFeedback({ type: 'error', text: 'Try another capital letter!' });
+    setWrongLowercase(lowercase);
+    setFeedback({ type: 'error', text: 'Try the matching letter!' });
     soundEffects.playError();
     if (wrongTimeoutRef.current) window.clearTimeout(wrongTimeoutRef.current);
     wrongTimeoutRef.current = window.setTimeout(() => {
       setWrongCapital('');
+      setWrongLowercase('');
       setFeedback(null);
     }, 900);
+  };
+
+  const chooseCapital = (capital: string) => {
+    if (matchedCapitals.includes(capital) || isComplete) return;
+    soundEffects.playClick();
+    playLetterName(capital);
+    setSelectedCapital(capital);
+    setFeedback(null);
+    if (selectedLowercase) matchPair(capital, selectedLowercase);
+  };
+
+  const chooseLowercase = (lowercase: string) => {
+    if (matchedCapitals.includes(lowercase.toUpperCase()) || isComplete) return;
+    soundEffects.playClick();
+    playLetterName(lowercase);
+    setSelectedLowercase(lowercase);
+    setFeedback(null);
+    if (selectedCapital) matchPair(selectedCapital, lowercase);
   };
 
   return (
@@ -103,7 +121,7 @@ export default function CapitalLowercaseMatchScreen({ letter, onComplete }: Capi
         </span>
         <div className="text-left">
           <h2 className="text-2xl font-black text-slate-800 md:text-4xl">Match capital and small letters</h2>
-          <p className="font-bold text-slate-500">Choose a small letter, then its capital letter.</p>
+          <p className="font-bold text-slate-500">Choose a letter from either side, then choose its match.</p>
         </div>
       </div>
 
@@ -143,13 +161,16 @@ export default function CapitalLowercaseMatchScreen({ letter, onComplete }: Capi
                 whileHover={!matched ? { scale: 1.08 } : undefined}
                 whileTap={!matched ? { scale: 0.92 } : undefined}
                 onClick={() => chooseCapital(capital)}
-                disabled={matched || !selectedLowercase}
+                disabled={matched}
+                aria-pressed={selectedCapital === capital}
                 className={`grid h-16 w-16 place-items-center self-center rounded-2xl border-4 text-4xl font-black shadow-lg transition md:h-20 md:w-20 md:text-5xl ${
                   matched
                     ? 'border-emerald-400 bg-emerald-100 text-emerald-700'
                     : wrongCapital === capital
                       ? 'border-red-500 bg-red-100 text-red-600'
-                      : 'border-white bg-gradient-to-br from-violet-500 to-fuchsia-500 text-white disabled:opacity-65'
+                      : selectedCapital === capital
+                        ? 'border-indigo-500 bg-indigo-100 text-indigo-700 ring-4 ring-indigo-200'
+                        : 'border-white bg-gradient-to-br from-violet-500 to-fuchsia-500 text-white'
                 }`}
               >
                 {capital}
@@ -169,12 +190,15 @@ export default function CapitalLowercaseMatchScreen({ letter, onComplete }: Capi
                 whileTap={!matched ? { scale: 0.92 } : undefined}
                 onClick={() => chooseLowercase(lowercase)}
                 disabled={matched}
+                aria-pressed={selectedLowercase === lowercase}
                 className={`grid h-16 w-16 place-items-center self-center rounded-2xl border-4 text-4xl font-black shadow-lg transition md:h-20 md:w-20 md:text-5xl ${
                   matched
                     ? 'border-emerald-400 bg-emerald-100 text-emerald-700'
-                    : selectedLowercase === lowercase
-                      ? 'border-indigo-500 bg-indigo-100 text-indigo-700 ring-4 ring-indigo-200'
-                      : 'border-white bg-gradient-to-br from-cyan-400 to-blue-500 text-white'
+                    : wrongLowercase === lowercase
+                      ? 'border-red-500 bg-red-100 text-red-600'
+                      : selectedLowercase === lowercase
+                        ? 'border-indigo-500 bg-indigo-100 text-indigo-700 ring-4 ring-indigo-200'
+                        : 'border-white bg-gradient-to-br from-cyan-400 to-blue-500 text-white'
                 }`}
               >
                 {lowercase}

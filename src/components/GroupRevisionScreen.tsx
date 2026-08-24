@@ -157,10 +157,12 @@ export default function GroupRevisionScreen({ groupId, group, onComplete, onExit
             transition={{ type: 'spring', stiffness: 260, damping: 25 }}
             className="flex w-full flex-col items-center"
           >
-            <motion.button
+              <motion.button
               type="button"
               onClick={() => void revealWords()}
-              aria-label={revealed ? `Play ${currentLetter.letter}` : `Reveal words for ${currentLetter.letter}`}
+                aria-label={revealed
+                  ? `Play ${String(currentLetter.letter).toLowerCase() === 'ck' ? 'c and k' : currentLetter.letter}`
+                  : `Reveal words for ${String(currentLetter.letter).toLowerCase() === 'ck' ? 'c and k' : currentLetter.letter}`}
               whileHover={{ scale: 1.07, rotate: -2 }}
               whileTap={{ scale: 0.93 }}
               className="relative grid min-h-40 min-w-40 place-items-center rounded-[3rem] border-[7px] border-white bg-gradient-to-br from-amber-300 via-orange-400 to-rose-500 px-8 text-white shadow-[0_24px_60px_rgba(244,114,182,0.35)] md:min-h-52 md:min-w-52"
@@ -172,7 +174,7 @@ export default function GroupRevisionScreen({ groupId, group, onComplete, onExit
                 transition={{ duration: revealed ? 2.4 : 1.7, repeat: Infinity, ease: 'easeInOut' }}
                 className="text-7xl font-black drop-shadow-lg md:text-9xl"
               >
-                {currentLetter.letter}
+                {String(currentLetter.letter).toLowerCase() === 'ck' ? 'c k' : currentLetter.letter}
               </motion.span>
             </motion.button>
 

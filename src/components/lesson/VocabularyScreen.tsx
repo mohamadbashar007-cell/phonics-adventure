@@ -47,7 +47,7 @@ export default function VocabularyScreen({ letter, preserveLetterCase = false, o
     || lessonSounds.find((sound) => wordHasSound(targetWord, sound));
   const displayLetter = preserveLetterCase
     ? String(wordSound || targetWord.match(/[A-Za-z]/)?.[0] || letter.letter || '').toUpperCase()
-    : String(letter.letter || '').toLowerCase();
+    : String(wordSound || letter.letter || '').toLowerCase();
   const targetAudioSrc = useMemo(() => getVocabularyAudioPath(targetWord), [targetWord]);
   const canAdvance = feedback?.type === 'success' || isSkipped;
 
