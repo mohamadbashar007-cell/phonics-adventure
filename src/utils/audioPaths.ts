@@ -3,7 +3,7 @@ import recordedAudioConfig from '../data/recordedAudioConfig.json';
 import recordedAudioPrompts from '../data/recordedAudioPrompts.json';
 
 // Make phones retry recordings that may have been cached as a failed request.
-const AUDIO_CACHE_VERSION = '20260823-word-only-tag';
+const AUDIO_CACHE_VERSION = '20260825-group7-audio-refresh';
 
 function withAudioVersion(value: string) {
   if (!value) return '';
@@ -101,6 +101,10 @@ export function getAlphabetTrainLetterAudioPath(letter: string) {
 export function getCapitalIntroLetterAudioPath(letter: string) {
   const key = sanitizeAudioKey(letter);
   return /^[a-z]$/.test(key) ? withAudioVersion(`/audio/group-7-letters/${key}.mp3`) : '';
+}
+
+export function getCapitalTraceLetterAudioPath(letter: string) {
+  return getCapitalIntroLetterAudioPath(letter);
 }
 
 const introSoundAudioSequences = new Map<string, string[]>([

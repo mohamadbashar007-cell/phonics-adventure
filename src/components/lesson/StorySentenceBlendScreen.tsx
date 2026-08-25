@@ -17,6 +17,10 @@ type WordTile = {
   word: string;
 };
 
+const excludedSentenceQuestions: Record<string, Set<string>> = {
+  'capital-pqr': new Set(["there's a rainbow in the sky"]),
+};
+
 function tokenize(sentence: string) {
   return sentence.match(/[A-Za-z]+(?:'[A-Za-z]+)?/g) || [];
 }
@@ -37,13 +41,17 @@ export default function StorySentenceBlendScreen({ letter, onComplete }: StorySe
   const storySentences = useMemo(() => {
     const text = String(letter?.story?.text || '').trim();
     const sentences = getStoryBlendSentences(text);
-    return (sentences.length ? sentences : [text]).filter(Boolean).slice(0, 3);
-  }, [letter?.story?.text]);
+    const excluded = excludedSentenceQuestions[String(letter?.id || '').toLowerCase()] || new Set<string>();
+    return (sentences.length ? sentences : [text])
+      .map((sentence, audioIndex) => ({ sentence, audioIndex }))
+      .filter((item) => item.sentence && !excluded.has(item.sentence.replace(/[.!?]+$/, '').trim().toLowerCase()));
+  }, [letter?.id, letter?.story?.text]);
   const [sentenceIndex, setSentenceIndex] = useState(0);
-  const sentence = storySentences[Math.min(sentenceIndex, storySentences.length - 1)] || '';
+  const sentenceItem = storySentences[Math.min(sentenceIndex, storySentences.length - 1)];
+  const sentence = sentenceItem?.sentence || '';
   const sentenceAudio = useMemo(
-    () => getStoryBlendSentenceAudioPath(letter, Math.min(sentenceIndex, storySentences.length - 1)),
-    [letter, sentenceIndex, storySentences.length],
+    () => getStoryBlendSentenceAudioPath(letter, sentenceItem?.audioIndex ?? 0),
+    [letter, sentenceItem?.audioIndex],
   );
   const targetWords = useMemo(() => tokenize(sentence), [sentence]);
   const [availableTiles, setAvailableTiles] = useState<WordTile[]>([]);

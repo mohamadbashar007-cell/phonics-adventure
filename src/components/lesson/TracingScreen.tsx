@@ -6,6 +6,7 @@ import { soundEffects } from '../../services/soundEffects';
 import { getLetterTrace, type LetterTrace } from '../../data/letterTraces';
 import { SequentialTraceValidator, TraceProgressState, type TracePoint } from '../../utils/sequentialTraceValidator';
 import { celebrateCorrectAnswer } from '../../utils/correctAnswerCelebration';
+import { getCapitalTraceLetterAudioPath } from '../../utils/audioPaths';
 import FeedbackToast from './FeedbackToast';
 
 interface TracingScreenProps {
@@ -82,6 +83,9 @@ export default function TracingScreen({ letter, traceLetters: traceLettersProp, 
   const activeTraceSound = /^[A-Z][a-z]$/.test(activeTraceLetter)
       ? activeTraceLetter[0].toLowerCase()
       : activeTraceLetter.toLowerCase();
+  const activeTraceAudio = /^[A-Z][a-z]$/.test(activeTraceLetter)
+    ? getCapitalTraceLetterAudioPath(activeTraceLetter[0])
+    : '';
   const traceInstruction = activeTraceLetter.length > 1
     ? `Trace '${activeTraceLabel}' together`
     : `Trace '${activeTraceLabel}'`;
@@ -102,6 +106,7 @@ export default function TracingScreen({ letter, traceLetters: traceLettersProp, 
     if (isSoundLoading) return;
     setIsSoundLoading(true);
     try {
+      if (activeTraceAudio && await audioService.playAudioFile(activeTraceAudio)) return;
       await audioService.playPrompt(activeTraceSound);
     } finally {
       setIsSoundLoading(false);
@@ -109,11 +114,12 @@ export default function TracingScreen({ letter, traceLetters: traceLettersProp, 
   };
 
   useEffect(() => {
+    if (activeTraceAudio) audioService.preloadAudioFile(activeTraceAudio, { priority: true });
     void playTraceSound();
     // The sound changes only when the active trace letter changes. Including
     // the loading state here would replay it after every completed playback.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTraceSound]);
+  }, [activeTraceAudio, activeTraceSound]);
 
   useEffect(() => {
     let cancelled = false;

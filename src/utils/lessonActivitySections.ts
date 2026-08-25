@@ -335,6 +335,21 @@ export function getLessonActivitySections(letter: any): ActivitySection[] {
   const source = letter?.activities || [];
   const words = getLessonWords(letter);
   const vocabulary = getLessonVocabulary(letter);
+  const lessonKey = String(letter?.id || '').toLowerCase();
+  const segmentWordReplacements: Record<string, Record<string, string>> = {
+    'capital-abc': { apple: 'cat' },
+    'capital-def': { doll: 'fish' },
+    'capital-jkl': { jelly: 'lion', juice: 'lemon' },
+    'capital-mno': { monkey: 'octopus' },
+  };
+  const replacements = segmentWordReplacements[lessonKey];
+  const segmentWords = replacements
+    ? dedupeWords(words.map((item) => {
+      const replacement = replacements[String(item.word || '').toLowerCase()];
+      if (!replacement) return item;
+      return words.find((candidate) => String(candidate.word || '').toLowerCase() === replacement) || { word: replacement };
+    }))
+    : words;
   const byType = (types: string[]) => source.filter((activity: any) => types.includes(activity?.type));
 
   const candidates: Record<ActivitySectionKey, any[]> = {
@@ -361,7 +376,7 @@ export function getLessonActivitySections(letter: any): ActivitySection[] {
     hear: String(letter?.id || '').startsWith('capital-') ? makeCapitalHearActivity(letter, words) : makeHearActivity(letter, words),
     match: makeMatchActivity(letter, words, vocabulary),
     blend: makeBlendActivity(words),
-    segment: makeSegmentActivity(words),
+    segment: makeSegmentActivity(segmentWords),
     balloons: makeBalloonsActivity(letter, vocabulary),
     tap: makeTapActivity(letter, words),
   };
